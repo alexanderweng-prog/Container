@@ -137,6 +137,27 @@ Was der Server erzwingt: nur `/v1/messages`, nur freigegebene Modelle, höchsten
 
 Ohne Docker geht es auch mit Node.js ab Version 20: `ANTHROPIC_API_KEY=… KLASSEN_CODE=… node server/server.js`.
 
+## Online mit Vercel (ohne eigenen Server, Schlüssel bleibt geheim)
+
+Vercel liefert die App aus und führt die kleine Weiterleitung als Server-Funktion aus (`api/`). Der API-Schlüssel liegt als geschützte Umgebungsvariable bei Vercel, nicht im Browser. HTTPS ist automatisch dabei.
+
+1. Bei vercel.com das GitHub-Repository `Container` als Projekt importieren. Einstellungen: «Framework Preset: Other», sonst nichts ändern.
+2. Unter **Settings → Environment Variables** eintragen:
+   - `ANTHROPIC_API_KEY`: ein eigener Schlüssel nur für diese App (als «Sensitive» markieren)
+   - `KLASSEN_CODE`: Pflicht. Ohne Code schaltet die App die KI auf Vercel ab, weil die Adresse öffentlich ist.
+   - optional `MODELLE` (z. B. `claude-haiku-5-5,claude-opus-5-5`, das erste ist der Standard) und `LIMIT_PRO_STUNDE`
+3. Danach einmal neu veröffentlichen (Deployments → «Redeploy»), damit die Variablen gelten.
+
+Jeder Push auf `main` aktualisiert die Seite automatisch. Pushes auf andere Branches erzeugen Vorschau-Adressen.
+
+Grenzen auf Vercel:
+- **Material höchstens ca. 4 MB pro Anfrage** (grosse PDFs verkleinern oder nur die nötigen Seiten nehmen). Die App warnt vorher.
+- **Das Stundenlimit ist nur ein grober Schutz.** Vercel startet bei Bedarf mehrere Instanzen, und jede zählt für sich. Wirklich begrenzen lassen sich die Kosten mit einem **Ausgabenlimit in der Anthropic-Konsole** für den verwendeten Schlüssel bzw. Workspace. Das unbedingt einrichten.
+- Die Funktion darf bis zu 300 Sekunden laufen (`vercel.json`). Falls dein Vercel-Plan weniger erlaubt, zeigt Vercel das beim Veröffentlichen an.
+- Der Gratis-Plan von Vercel ist laut Vercel für persönliche, nicht kommerzielle Nutzung gedacht. Ob das für deinen Einsatz passt, bitte selbst prüfen.
+
+Container und Vercel nutzen dieselbe Prüflogik (`server/kern.cjs`): Klassencode, freigegebene Modelle, Token-Grenze und Limit.
+
 ## Über das Internet erreichbar machen (HTTPS)
 
 Ohne HTTPS gehen Klassencode und Schülertexte unverschlüsselt durchs Netz. Für den Zugriff von ausserhalb des eigenen Netzes deshalb immer die HTTPS-Variante nehmen:
@@ -188,3 +209,5 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt. `js/anthropic-sdk-1.5.0.min.js` i
 - `server/server.js` – Auslieferung und KI-Weiterleitung mit Schlüssel (ohne Abhängigkeiten)
 - `Dockerfile`, `docker-compose.yml`, `env.beispiel`
 - `docker-compose.https.yml`, `Caddyfile` – Variante mit HTTPS
+- `api/`, `vercel.json` – Variante für Vercel
+- `server/kern.cjs` – gemeinsame Prüf- und Weiterleitungslogik (Container und Vercel)

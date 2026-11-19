@@ -147,6 +147,7 @@ Aufbau:
     if (e && e.error && e.error.error && e.error.error.type === 'lernwerkstatt_error') return new Error(e.error.error.message);
     if (s === 401) return new Error(serverModus() ? 'Klassencode falsch oder fehlt.' : 'API-Schlüssel ungültig (401). Bitte in den Einstellungen prüfen.');
     if (s === 403) return new Error('Kein Zugriff auf dieses Modell (403).');
+    if (s === 413) return new Error('Die Anfrage ist zu gross für den Server. Bitte eine kleinere PDF oder weniger/kleinere Bilder verwenden.');
     if (s === 429) return new Error('Zu viele Anfragen oder Guthaben aufgebraucht (429). Kurz warten oder Guthaben prüfen.');
     if (s === 529 || s >= 500) return new Error('Der KI-Dienst ist gerade überlastet. Bitte später nochmals versuchen.');
     if (e && /fetch|network/i.test(String(e.message))) return new Error('Keine Verbindung zum KI-Dienst (Internet/Firewall?).');

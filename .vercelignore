@@ -1,0 +1,11 @@
+# Nur die App und die Funktionen gehören auf Vercel
+tests/
+node_modules/
+playwright-report/
+test-results/
+Dockerfile
+docker-compose*.yml
+Caddyfile
+.github/
+.env
+env.beispiel

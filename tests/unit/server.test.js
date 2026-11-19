@@ -40,7 +40,7 @@ const ki = (body, kopf = {}) => fetch(basis + '/api/anthropic/v1/messages', {
 
 test('Status meldet Server-KI und Klassencode', async () => {
   const s = await (await fetch(basis + '/api/status')).json();
-  assert.deepEqual(s, { serverKi: true, codeNoetig: true, modelle: ['claude-haiku-5-5', 'claude-opus-5-5'] });
+  assert.deepEqual(s, { serverKi: true, codeNoetig: true, modelle: ['claude-haiku-5-5', 'claude-opus-5-5'], maxAnfrage: 32 * 1024 * 1024 });
 });
 
 test('App wird ausgeliefert, Server-Code und fremde Pfade nicht', async () => {

@@ -143,6 +143,13 @@
     const dreiNiveaus = h('input', { type: 'checkbox', id: 'dreiniveaus' });
     const knopf = h('button', { class: 'knopf', onclick: async () => {
       if (!material.value.trim() && !dateien.length) { status.textContent = 'Bitte Text einfügen oder eine Datei wählen.'; return; }
+      // Über den Server (z. B. Vercel) ist die Grösse einer Anfrage begrenzt
+      const max = LA.serverModus() && LA.serverStatus.maxAnfrage;
+      const groesse = material.value.length + dateien.reduce((n, d) => n + (d.base64 || d.text || '').length, 0);
+      if (max && groesse > max * 0.95) {
+        LA.setzen(status, h('div', { class: 'rueckmeldung nein' }, `Das Material ist zu gross für den Server (etwa ${(groesse / 1e6).toFixed(1)} MB, höchstens ${(max / 1e6).toFixed(1)} MB). Tipp: PDF verkleinern, nur die nötigen Seiten nehmen oder Fotos mit geringerer Auflösung.`));
+        return;
+      }
       knopf.disabled = true;
       const start = Date.now();
       const tick = setInterval(() => { status.firstChild && (status.firstChild.textContent = `Die KI erstellt das Lernpaket … ${Math.round((Date.now() - start) / 1000)} s`); }, 1000);
