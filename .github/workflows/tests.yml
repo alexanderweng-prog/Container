@@ -9,8 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Image bauen
         run: docker build -t lernwerkstatt:ci .
       - name: Container startet und liefert die App aus
@@ -49,9 +49,11 @@ jobs:
     env:
       DOMAIN: localhost
       KLASSEN_CODE: ci
+      # Platzhalter: ohne Schlüssel antwortet der Server vor der Limit-Zählung mit 503
+      ANTHROPIC_API_KEY: sk-ant-ci-platzhalter
       LIMIT_PRO_STUNDE: "2"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: HTTPS-Variante starten (Caddy mit lokalem Zertifikat)
         run: docker compose -f docker-compose.https.yml up -d --build
       - name: HTTPS, Umleitung, Sicherheits-Header, Port 8080 geschlossen
@@ -68,7 +70,7 @@ jobs:
               -H 'x-klassen-code: ci' -H "x-forwarded-for: 10.0.0.$i" -H 'content-type: application/json' \
               -d '{"model":"claude-haiku-5-5","max_tokens":5,"messages":[]}')"
           done
-          echo "Antworten:$codes"
+          echo "Antworten:$codes (erwartet: zwei Versuche, dann 429)"
           [ "$(echo $codes | awk '{print $3}')" = "429" ]
       - name: Aufräumen
         if: always()
