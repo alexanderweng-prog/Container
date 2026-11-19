@@ -203,3 +203,69 @@ legend { font-weight: 600; padding: 0 6px; }
 .toast-fehler { background: var(--no); color: #fff; }
 .toast.weg { opacity: 0; }
 details summary { cursor: pointer; }
+
+/* Vorlesen */
+.vorlesen { flex: none; background: var(--surface-2); border: 1px solid var(--line); border-radius: 99px; width: 40px; height: 40px; font-size: 18px; line-height: 1; display: inline-grid; place-items: center; padding: 0; }
+.vorlesen:hover { border-color: var(--accent); }
+.vorlesen.spricht { background: var(--accent); border-color: var(--accent); animation: puls 1.2s ease-in-out infinite; }
+@keyframes puls { 50% { opacity: .6; } }
+.mit-ton, .titel-zeile { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; }
+.mit-ton > :first-child, .titel-zeile > :first-child { flex: 1; min-width: 0; }
+.label.mit-ton { align-items: center; }
+.label .vorlesen { width: 32px; height: 32px; font-size: 15px; }
+/* Fast richtig */
+.luecke.fast { border-color: #c8952c; background: var(--warn-soft); cursor: help; }
+
+/* ---------- Druckversion (A4) ---------- */
+#druckbereich { display: none; }
+@page { size: A4; margin: 14mm 15mm; }
+@media print {
+  body > *:not(#druckbereich) { display: none !important; }
+  body { background: #fff; color: #000; display: block; font-size: 11pt; line-height: 1.45; }
+  #druckbereich { display: block; }
+  #druckbereich h1 { font-size: 18pt; margin: 0; }
+  #druckbereich h2 { font-size: 12.5pt; margin: 0 0 2mm; }
+  #druckbereich h3 { font-size: 11pt; margin: 2mm 0 1mm; }
+  #druckbereich p { margin: 0 0 2mm; }
+  #druckbereich ol, #druckbereich ul { margin: 0 0 2mm; padding-left: 6mm; }
+  .druck-kopf { display: flex; justify-content: space-between; align-items: flex-end; gap: 8mm; border-bottom: 1.5pt solid #000; padding-bottom: 3mm; margin-bottom: 5mm; }
+  .druck-fach { font-size: 9pt; letter-spacing: .08em; text-transform: uppercase; color: #444; }
+  .druck-name { display: flex; flex-direction: column; gap: 3mm; font-size: 10pt; }
+  .feld { display: inline-block; width: 50mm; border-bottom: .7pt solid #000; }
+  .feld.kurz { width: 30mm; }
+  .feld.eintrag { width: 10mm; margin-left: 3mm; }
+  .druck-spalten { table-layout: fixed; }
+  .druck-aufgabe, .druck-kapitel, .druck-offen, .druck-mc > li { break-inside: avoid; }
+  .druck-aufgabe { margin: 0 0 6mm; }
+  .auftrag { font-style: italic; }
+  .druck-lerntext { margin-bottom: 6mm; }
+  .druck-merksatz { border: .8pt solid #000; padding: 1.5mm 3mm; font-weight: 600; }
+  .kaestchen { display: inline-block; width: 3.6mm; height: 3.6mm; border: .8pt solid #000; vertical-align: -0.5mm; }
+  .kaestchen.gross { width: 7mm; height: 6mm; vertical-align: -1.5mm; }
+  .druck-mc > li { margin-bottom: 2.5mm; }
+  .druck-optionen { list-style: none; padding-left: 2mm !important; display: grid; grid-template-columns: 1fr 1fr; gap: 1mm 6mm; margin-top: 1mm !important; }
+  .druck-wortkasten { border: .8pt solid #000; padding: 2mm 3mm; margin: 0 0 3mm; text-align: center; }
+  .druck-luecken { line-height: 2.3; }
+  .druck-luecke { display: inline-block; min-width: 28mm; border-bottom: .8pt solid #000; position: relative; margin: 0 1mm; }
+  .druck-nr { font-size: 8pt; margin-left: 1mm; }
+  .druck-tabelle { width: 100%; border-collapse: collapse; }
+  .druck-tabelle th, .druck-tabelle td { border: .7pt solid #000; padding: 1.5mm 2mm; vertical-align: top; text-align: left; }
+  .druck-tabelle .schmal { width: 13mm; text-align: center; vertical-align: middle; }
+  .druck-tabelle .linie { margin-top: 5mm; }
+  .druck-spalten th { text-align: center; }
+  .druck-verbinden { display: grid; grid-template-columns: 1fr 1.6fr; gap: 10mm; }
+  .druck-verbinden ul { list-style: none; padding-left: 0 !important; }
+  .druck-verbinden li { margin-bottom: 2.5mm; }
+  .druck-reihenfolge { list-style: none; padding-left: 0 !important; }
+  .druck-reihenfolge li { margin-bottom: 2.5mm; }
+  .druck-kw { border-collapse: collapse; margin: 2mm auto 4mm; }
+  .druck-kw td { width: var(--z); height: var(--z); padding: 0; position: relative; text-align: center; font-weight: 700; font-size: 10pt; }
+  .druck-kw td.voll { border: .8pt solid #000; }
+  .druck-kw sup { position: absolute; top: .3mm; left: .5mm; font-size: 5.5pt; font-weight: 400; }
+  .druck-zweispaltig-block { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; font-size: 10pt; }
+  .druck-zweispaltig { columns: 2; }
+  .linien .linie, .linie { border-bottom: .6pt solid #777; height: 8.5mm; }
+  .klein { font-size: 9pt; color: #333; }
+  .druck-loesung { break-before: page; }
+  .druck-loesung h1 { border-bottom: 1.5pt solid #000; padding-bottom: 3mm; margin-bottom: 5mm !important; }
+}

@@ -11,7 +11,7 @@ window.LA = window.LA || {};
         if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
         else if (k === 'class') el.className = v;
         else if (k === 'html') el.innerHTML = v;
-        else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+        else if (k === 'style' && typeof v === 'object') for (const [sk, sv] of Object.entries(v)) { if (sk.startsWith('--')) el.style.setProperty(sk, sv); else el.style[sk] = sv; }
         else el.setAttribute(k, v === true ? '' : v);
       }
     }
@@ -19,6 +19,12 @@ window.LA = window.LA || {};
       if (kind === null || kind === undefined || kind === false) continue;
       el.append(kind instanceof Node ? kind : document.createTextNode(String(kind)));
     }
+    return el;
+  };
+
+  // Wie replaceChildren, lässt aber null/false/undefined weg (sonst stünde «null» im Text)
+  LA.setzen = function (el, ...kinder) {
+    el.replaceChildren(...kinder.flat(Infinity).filter((k) => k !== null && k !== undefined && k !== false && k !== ''));
     return el;
   };
 
@@ -55,6 +61,63 @@ window.LA = window.LA || {};
 
   // Vergleich von Antworten: Gross/klein, Leerzeichen, ß/ss egal
   LA.norm = (s) => String(s ?? '').trim().toLowerCase().replace(/ß/g, 'ss').replace(/\s+/g, ' ').replace(/[.,;:!?]+$/, '');
+
+  // Tolerante Prüfung: Umlaute = ae/oe/ue, kleine Tippfehler gelten als «fast richtig»
+  const umlautFrei = (s) => LA.norm(s).replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue');
+  // Editierdistanz (Einfügen, Löschen, Ersetzen, Vertauschen zweier Nachbarbuchstaben)
+  LA.abstand = function (a, b) {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array(b.length).fill(0)]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        const kosten = a[i - 1] === b[j - 1] ? 0 : 1;
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + kosten);
+        if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+      }
+    }
+    return d[a.length][b.length];
+  };
+  // Ergebnis: 'richtig' | 'fast' | 'falsch'
+  LA.antwortPruefen = function (eingabe, loesung) {
+    const a = umlautFrei(eingabe), b = umlautFrei(loesung);
+    if (!a) return 'falsch';
+    if (a === b) return 'richtig';
+    const erlaubt = b.length >= 10 ? 2 : b.length >= 5 ? 1 : 0;
+    return erlaubt && LA.abstand(a, b) <= erlaubt ? 'fast' : 'falsch';
+  };
+
+  // Vorlesen mit der Sprachausgabe des Browsers (gratis, ohne KI, Qualität je nach Gerät)
+  LA.vorlesenMoeglich = () => 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+  let aktiverKnopf = null;
+  function stimme() {
+    const alle = window.speechSynthesis.getVoices();
+    return alle.find((v) => /^de-CH/i.test(v.lang)) || alle.find((v) => /^de-DE/i.test(v.lang)) || alle.find((v) => /^de/i.test(v.lang)) || null;
+  }
+  LA.vorlesen = function (text, knopf) {
+    if (!LA.vorlesenMoeglich()) return;
+    const synth = window.speechSynthesis;
+    const warAktiv = aktiverKnopf === knopf && synth.speaking;
+    synth.cancel();
+    if (aktiverKnopf) aktiverKnopf.classList.remove('spricht');
+    aktiverKnopf = null;
+    if (warAktiv) return; // zweiter Klick = stoppen
+    const sauber = String(text).replace(/\*\*|__/g, '').replace(/\{\{.+?\}\}/g, ' … Lücke … ').replace(/^\s*[-•]\s+/gm, '').replace(/\s+/g, ' ').trim();
+    const u = new SpeechSynthesisUtterance(sauber);
+    u.lang = 'de-DE';
+    const v = stimme(); if (v) { u.voice = v; u.lang = v.lang; }
+    u.rate = 0.95;
+    u.onend = u.onerror = () => { if (knopf) knopf.classList.remove('spricht'); if (aktiverKnopf === knopf) aktiverKnopf = null; };
+    if (knopf) { knopf.classList.add('spricht'); aktiverKnopf = knopf; }
+    synth.speak(u);
+  };
+  // Knopf erzeugen; text darf eine Funktion sein (wird beim Klick ausgewertet)
+  LA.vorleseKnopf = function (text, beschriftung = 'Vorlesen') {
+    if (!LA.vorlesenMoeglich()) return null;
+    const k = LA.h('button', { class: 'vorlesen', type: 'button', title: beschriftung, 'aria-label': beschriftung }, '🔊');
+    k.addEventListener('click', (e) => { e.stopPropagation(); LA.vorlesen(typeof text === 'function' ? text() : text, k); });
+    return k;
+  };
+  LA.vorlesenStoppen = () => { if (LA.vorlesenMoeglich()) window.speechSynthesis.cancel(); if (aktiverKnopf) aktiverKnopf.classList.remove('spricht'); aktiverKnopf = null; };
 
   // Für Kreuzworträtsel: nur Grossbuchstaben A–Z
   LA.kreuzwortForm = (s) => String(s ?? '').toUpperCase()

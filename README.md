@@ -19,6 +19,16 @@ Du gibst Unterrichtsmaterial hinein (Text, PDF, Foto eines Arbeitsblatts). Die K
 
 Die Spiele, die gar nicht zum Inhalt passen (z. B. Reihenfolge ohne Ablauf), erscheinen nicht. Unter «Bearbeiten» kannst du Spiele ein- und ausschalten und jede Frage im JSON ändern.
 
+## Für alle Spiele
+
+- **Vorlesen** 🔊: Erklärungen, Fragen, Aussagen und Aufträge können vorgelesen werden. Das macht der Browser selbst, gratis und ohne KI. Die Stimme hängt vom Gerät ab und ist nicht überall gut. Ein zweiter Klick stoppt.
+- **Tippfehler**: Im Lückentext zählen kleine Tippfehler («Verdunstug») als richtig, die korrekte Schreibweise wird aber angezeigt. Kurze Wörter (unter 5 Buchstaben) werden streng geprüft, weil sonst «Mehr» für «Meer» durchginge. Umlaute dürfen als ae/oe/ue geschrieben werden.
+- **Kreuzworträtsel**: Ä, Ö, Ü und ß normal tippen, sie werden automatisch auf zwei Felder verteilt (AE, OE, UE, SS).
+
+## Arbeitsblatt drucken
+
+In der Paketübersicht auf **Drucken**: Teile auswählen, dann im Druckdialog drucken oder «Als PDF speichern». Es entsteht ein A4-Blatt mit Namensfeld und ein Lösungsblatt auf einer neuen Seite. Memory wird auf Papier zu «Begriffe verbinden». Die Reihenfolge der Antworten wird bei jedem Druck neu gemischt, das Lösungsblatt passt immer zum Blatt aus demselben Druckvorgang.
+
 ## Starten
 
 - `index.html` doppelklicken. Es braucht keinen Server und keine Installation.
@@ -79,6 +89,7 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt. `js/anthropic-sdk-1.5.0.min.js` i
 - `js/ki.js` – Prompts, JSON-Schemas (strukturierte Ausgabe), Aufrufe
 - `js/spiele.js` – alle Spieltypen
 - `js/offline.js` – Generator ohne KI und Demo-Paket
+- `js/druck.js` – Arbeitsblatt und Lösungsblatt
 - `js/app.js` – Ansichten, Speicher, Teilen
 - `server/server.js` – Auslieferung und KI-Weiterleitung mit Schlüssel (ohne Abhängigkeiten)
 - `Dockerfile`, `docker-compose.yml`, `env.beispiel`

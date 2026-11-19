@@ -8,7 +8,7 @@
   }
   function ergebnis(wurzel, punkte, max, nochmal, text) {
     const q = max ? punkte / max : 0;
-    wurzel.replaceChildren(h('div', { class: 'ergebnis' },
+    LA.setzen(wurzel, h('div', { class: 'ergebnis' },
       h('div', { class: 'ergebnis-zahl' }, `${punkte} / ${max}`),
       h('p', null, text || (q >= 0.9 ? 'Ausgezeichnet!' : q >= 0.7 ? 'Gut gemacht. Schau dir die Fehler nochmals an.' : q >= 0.5 ? 'Solide Basis – üb das nochmals.' : 'Geh zurück in den Lernpfad und versuch es dann nochmals.')),
       h('div', { class: 'reihe' }, h('button', { class: 'knopf', onclick: nochmal }, 'Nochmals'), h('button', { class: 'knopf sekundaer', onclick: () => LA.zurUebersicht() }, 'Zur Übersicht'))));
@@ -19,7 +19,8 @@
     const reihenfolge = LA.mischen(frage.optionen.map((_, i) => i));
     const knoepfe = [];
     const rueck = h('div', { class: 'rueckmeldung', 'aria-live': 'polite' });
-    const box = h('div', { class: 'mc' }, h('div', { class: 'frage' }, frage.frage),
+    const vorlesenText = () => frage.frage + ' … ' + reihenfolge.map((i, n) => `${n + 1}: ${frage.optionen[i]}`).join(' … ');
+    const box = h('div', { class: 'mc' }, h('div', { class: 'frage mit-ton' }, h('span', null, frage.frage), LA.vorleseKnopf(vorlesenText, 'Frage vorlesen')),
       h('div', { class: 'optionen' }, reihenfolge.map((i) => {
         const k = h('button', { class: 'option', onclick: () => waehle(i, k) }, frage.optionen[i]);
         knoepfe.push([i, k]); return k;
@@ -31,7 +32,7 @@
       for (const [j, kn] of knoepfe) { kn.disabled = true; if (j === frage.richtig) kn.classList.add('richtig'); }
       if (!richtig) k.classList.add('falsch');
       rueck.className = 'rueckmeldung ' + (richtig ? 'ok' : 'nein');
-      rueck.replaceChildren(h('strong', null, richtig ? 'Richtig. ' : 'Leider falsch. '), frage.erklaerung || '');
+      LA.setzen(rueck, h('strong', null, richtig ? 'Richtig. ' : 'Leider falsch. '), frage.erklaerung || '');
       beiAntwort(richtig);
     }
     return box;
@@ -50,10 +51,11 @@
         const k = p.kapitel[i];
         const weiter = h('button', { class: 'knopf', disabled: true, onclick: () => { i++; zeige(); window.scrollTo({ top: 0 }); } }, i + 1 < p.kapitel.length ? 'Weiter' : 'Abschliessen');
         const nachfrage = LA.kiVerfuegbar() ? nachfrageBox(k, p) : null;
-        w.replaceChildren(
+        LA.setzen(w, 
           fortschrittsbalken(i, p.kapitel.length),
           h('div', { class: 'label' }, `Schritt ${i + 1} von ${p.kapitel.length}`),
-          h('h2', null, k.titel),
+          h('div', { class: 'titel-zeile' }, h('h2', null, k.titel),
+            LA.vorleseKnopf(() => [k.titel, k.erklaerung, k.beispiel ? 'Beispiel: ' + k.beispiel : '', k.merksatz ? 'Merksatz: ' + k.merksatz : ''].filter(Boolean).join(' … '), 'Erklärung vorlesen')),
           h('div', { class: 'erklaerung', html: LA.md(k.erklaerung) }),
           k.beispiel ? h('div', { class: 'kasten beispiel' }, h('div', { class: 'label' }, 'Beispiel'), k.beispiel) : null,
           k.merksatz ? h('div', { class: 'kasten merksatz' }, h('div', { class: 'label' }, 'Merksatz'), k.merksatz) : null,
@@ -90,7 +92,7 @@
       const zeige = () => {
         if (i >= fragen.length) { fertig(punkte, fragen.length); return ergebnis(w, punkte, fragen.length, () => SPIELE.multiple_choice.start(w, p, fertig)); }
         const weiter = h('button', { class: 'knopf', disabled: true, onclick: () => { i++; zeige(); } }, 'Weiter');
-        w.replaceChildren(fortschrittsbalken(i, fragen.length), h('div', { class: 'label' }, `Frage ${i + 1} von ${fragen.length} · ${punkte} richtig`),
+        LA.setzen(w, fortschrittsbalken(i, fragen.length), h('div', { class: 'label' }, `Frage ${i + 1} von ${fragen.length} · ${punkte} richtig`),
           mcKarte(fragen[i], (ok) => { if (ok) punkte++; weiter.disabled = false; weiter.focus(); }), h('div', { class: 'reihe rechts' }, weiter));
       };
       zeige();
@@ -127,19 +129,22 @@
         } }, wort)));
       const pruefen = h('button', { class: 'knopf', onclick: () => {
         let punkte = 0;
+        const fast = [];
         for (const f of felder) {
-          const ok = LA.norm(f.value) === LA.norm(f.dataset.loesung);
-          f.classList.toggle('richtig', ok); f.classList.toggle('falsch', !ok);
-          if (!ok) f.title = 'Richtig: ' + f.dataset.loesung;
-          if (ok) punkte++;
+          const urteil = LA.antwortPruefen(f.value, f.dataset.loesung);
+          f.classList.remove('richtig', 'fast', 'falsch'); f.classList.add(urteil);
+          f.title = urteil === 'richtig' ? '' : 'Richtig: ' + f.dataset.loesung;
+          if (urteil !== 'falsch') punkte++;
+          if (urteil === 'fast') fast.push(`«${f.value.trim()}» → ${f.dataset.loesung}`);
         }
         fertig(punkte, felder.length);
-        info.textContent = `${punkte} von ${felder.length} richtig.` + (punkte < felder.length ? ' Fahre über rote Felder (oder tippe darauf) für die Lösung.' : '');
-        felder.forEach((f) => { if (f.classList.contains('falsch')) f.addEventListener('click', () => { f.value = f.dataset.loesung; }, { once: true }); });
+        LA.setzen(info, `${punkte} von ${felder.length} richtig.` + (punkte < felder.length ? ' Tippe auf rote Felder für die Lösung.' : ''),
+          fast.length ? h('div', { class: 'hinweis' }, 'Gezählt, aber achte auf die Schreibweise: ', fast.join(', ')) : '');
+        felder.forEach((f) => { if (f.classList.contains('falsch') || f.classList.contains('fast')) f.addEventListener('click', () => { f.value = f.dataset.loesung; }, { once: true }); });
       } }, 'Prüfen');
       const info = h('div', { class: 'rueckmeldung', 'aria-live': 'polite' });
       const hilfe = h('label', { class: 'schalter' }, h('input', { type: 'checkbox', checked: true, onchange: (e) => { bank.hidden = !e.target.checked; } }), ' Wörter anzeigen');
-      w.replaceChildren(h('h2', null, lt.titel || 'Lückentext'), hilfe, bank, text, h('div', { class: 'reihe' }, pruefen, h('button', { class: 'knopf sekundaer', onclick: () => SPIELE.lueckentext.start(w, p, fertig) }, 'Neu')), info);
+      LA.setzen(w, h('div', { class: 'titel-zeile' }, h('h2', null, lt.titel || 'Lückentext'), LA.vorleseKnopf(lt.text, 'Text vorlesen')), hilfe, bank, text, h('div', { class: 'reihe' }, pruefen, h('button', { class: 'knopf sekundaer', onclick: () => SPIELE.lueckentext.start(w, p, fertig) }, 'Neu')), info);
     },
   };
 
@@ -179,7 +184,7 @@
         raster.append(el);
       }
       aktualisieren();
-      w.replaceChildren(h('h2', null, 'Memory'), h('p', { class: 'hinweis' }, 'Decke zwei Karten auf: Ein Begriff (dunkel) und seine Erklärung (hell) bilden ein Paar.'), status, raster);
+      LA.setzen(w, h('h2', null, 'Memory'), h('p', { class: 'hinweis' }, 'Decke zwei Karten auf: Ein Begriff (dunkel) und seine Erklärung (hell) bilden ein Paar.'), status, raster);
     },
   };
 
@@ -252,17 +257,25 @@
         if (!teil.length) { gitter.append(h('div', { class: 'kw-leer' })); continue; }
         const g = teil[0], idx = g.dx ? x - g.x : y - g.y;
         const nr = woerter.find((s) => s.x === x && s.y === y);
-        const inp = h('input', { class: 'kw-feld', maxlength: 1, autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-label': `Feld ${x + 1},${y + 1}` });
+        const inp = h('input', { class: 'kw-feld', autocomplete: 'off', autocapitalize: 'characters', spellcheck: 'false', 'aria-label': `Feld ${x + 1},${y + 1}` });
         inp.dataset.loesung = g.wort[idx];
         inp.addEventListener('focus', () => {
           const hat = (dx) => teil.some((t) => t.dx === dx);
           if (!hat(richtung.dx)) richtung = hat(1) ? { dx: 1, dy: 0 } : { dx: 0, dy: 1 };
           markiere(x, y);
+          inp.select(); // neues Zeichen ersetzt das alte
         });
         inp.addEventListener('input', () => {
-          inp.value = LA.kreuzwortForm(inp.value).slice(-1);
+          // Ä → AE, Ö → OE, Ü → UE, ß → SS: zweiter Buchstabe kommt ins nächste Feld
+          const zeichen = LA.kreuzwortForm(inp.value.slice(-1));
+          inp.value = zeichen.charAt(0);
           inp.classList.remove('falsch', 'richtig');
-          const n = felder.get((x + richtung.dx) + ',' + (y + richtung.dy)); if (inp.value && n) n.focus();
+          let n = felder.get((x + richtung.dx) + ',' + (y + richtung.dy));
+          if (zeichen.length > 1 && n) {
+            n.value = zeichen.charAt(1); n.classList.remove('falsch', 'richtig');
+            n = felder.get((x + 2 * richtung.dx) + ',' + (y + 2 * richtung.dy));
+          }
+          if (inp.value && n) n.focus();
         });
         inp.addEventListener('keydown', (e) => {
           const ziele = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] };
@@ -300,8 +313,8 @@
       const groesse = () => { if (!gitter.isConnected) return window.removeEventListener('resize', groesse); const px = Math.floor((wrap.clientWidth - 2 * (breite - 1)) / breite); gitter.style.setProperty('--kw', Math.max(18, Math.min(36, px)) + 'px'); };
       requestAnimationFrame(groesse);
       window.addEventListener('resize', groesse);
-      w.replaceChildren(h('h2', null, 'Kreuzworträtsel'), h('p', { class: 'hinweis' }, 'Umlaute als AE, OE, UE schreiben. Pfeiltasten wechseln die Richtung.'),
-        hinweisZeile, wrap, h('div', { class: 'kw-listen' }, liste(1, 'Waagrecht'), liste(0, 'Senkrecht')),
+      LA.setzen(w, h('h2', null, 'Kreuzworträtsel'), h('p', { class: 'hinweis' }, 'Ä, Ö, Ü und ß darfst du normal tippen – sie werden automatisch zu AE, OE, UE, SS. Pfeiltasten wechseln die Richtung.'),
+        h('div', { class: 'mit-ton' }, hinweisZeile, LA.vorleseKnopf(() => hinweisZeile.textContent, 'Hinweis vorlesen')), wrap, h('div', { class: 'kw-listen' }, liste(1, 'Waagrecht'), liste(0, 'Senkrecht')),
         h('div', { class: 'reihe' }, pruefen, aufloesen, h('button', { class: 'knopf sekundaer', onclick: () => SPIELE.kreuzwort.start(w, p, fertig) }, 'Neues Rätsel')), info);
     },
   };
@@ -323,13 +336,13 @@
           const ok = wahl === a.wahr; if (ok) punkte++;
           k.classList.add(ok ? 'richtig' : 'falsch');
           rueck.className = 'rueckmeldung ' + (ok ? 'ok' : 'nein');
-          rueck.replaceChildren(h('strong', null, (ok ? 'Richtig – ' : 'Nein – ') + (a.wahr ? 'die Aussage stimmt. ' : 'die Aussage stimmt nicht. ')), a.erklaerung || '');
+          LA.setzen(rueck, h('strong', null, (ok ? 'Richtig – ' : 'Nein – ') + (a.wahr ? 'die Aussage stimmt. ' : 'die Aussage stimmt nicht. ')), a.erklaerung || '');
           weiter.disabled = false; weiter.focus();
         };
         const wk = h('button', { class: 'option gross', onclick: () => antwort(true, wk) }, 'Wahr');
         const fk = h('button', { class: 'option gross', onclick: () => antwort(false, fk) }, 'Falsch');
-        w.replaceChildren(fortschrittsbalken(i, liste.length), h('div', { class: 'label' }, `Aussage ${i + 1} von ${liste.length}`),
-          h('div', { class: 'frage aussage' }, a.aussage), h('div', { class: 'wf' }, wk, fk), rueck, h('div', { class: 'reihe rechts' }, weiter));
+        LA.setzen(w, fortschrittsbalken(i, liste.length), h('div', { class: 'label' }, `Aussage ${i + 1} von ${liste.length}`),
+          h('div', { class: 'frage aussage mit-ton' }, h('span', null, a.aussage), LA.vorleseKnopf(a.aussage, 'Aussage vorlesen')), h('div', { class: 'wf' }, wk, fk), rueck, h('div', { class: 'reihe rechts' }, weiter));
       };
       zeige();
     },
@@ -346,7 +359,7 @@
       const liste = h('ol', { class: 'sortier' });
       const info = h('div', { class: 'rueckmeldung', 'aria-live': 'polite' });
       const zeichne = (markieren) => {
-        liste.replaceChildren(...ordnung.map((idx, pos) => h('li', { class: 'sortier-el' + (markieren ? (idx === pos ? ' richtig' : ' falsch') : '') },
+        LA.setzen(liste, ...ordnung.map((idx, pos) => h('li', { class: 'sortier-el' + (markieren ? (idx === pos ? ' richtig' : ' falsch') : '') },
           h('span', { class: 'sortier-text' }, r.schritte[idx]),
           h('span', { class: 'sortier-knoepfe' },
             h('button', { class: 'mini', 'aria-label': 'nach oben', disabled: pos === 0, onclick: () => tausche(pos, pos - 1) }, '▲'),
@@ -354,7 +367,7 @@
       };
       const tausche = (a, b) => { [ordnung[a], ordnung[b]] = [ordnung[b], ordnung[a]]; zeichne(false); info.textContent = ''; };
       zeichne(false);
-      w.replaceChildren(h('h2', null, 'Reihenfolge'), h('p', { class: 'hinweis' }, r.titel), liste,
+      LA.setzen(w, h('h2', null, 'Reihenfolge'), h('p', { class: 'hinweis' }, r.titel), liste,
         h('div', { class: 'reihe' }, h('button', { class: 'knopf', onclick: () => {
           const punkte = ordnung.filter((v, i) => v === i).length;
           zeichne(true); fertig(punkte, ordnung.length);
@@ -376,15 +389,15 @@
       const spalten = h('div', { class: 'kategorien' });
       const info = h('div', { class: 'rueckmeldung', 'aria-live': 'polite' });
       const zeichne = () => {
-        vorrat.replaceChildren(...begriffe.filter((b) => !zuordnung.has(b)).map((b) =>
+        LA.setzen(vorrat, ...begriffe.filter((b) => !zuordnung.has(b)).map((b) =>
           h('button', { class: 'chip' + (gewaehlt === b ? ' gewaehlt' : ''), onclick: () => { gewaehlt = gewaehlt === b ? null : b; zeichne(); } }, b.begriff)));
         if (!vorrat.children.length) vorrat.append(h('span', { class: 'hinweis' }, 'Alle Begriffe sind verteilt. Jetzt prüfen!'));
-        spalten.replaceChildren(...kategorien.map((k) => h('div', { class: 'kategorie' + (gewaehlt ? ' bereit' : ''), onclick: () => { if (gewaehlt) { zuordnung.set(gewaehlt, k); gewaehlt = null; zeichne(); } } },
+        LA.setzen(spalten, ...kategorien.map((k) => h('div', { class: 'kategorie' + (gewaehlt ? ' bereit' : ''), onclick: () => { if (gewaehlt) { zuordnung.set(gewaehlt, k); gewaehlt = null; zeichne(); } } },
           h('div', { class: 'kategorie-titel' }, k),
           begriffe.filter((b) => zuordnung.get(b) === k).map((b) => h('button', { class: 'chip klein', title: 'zurücklegen', onclick: (e) => { e.stopPropagation(); zuordnung.delete(b); zeichne(); } }, b.begriff)))));
       };
       zeichne();
-      w.replaceChildren(h('h2', null, 'Zuordnen'), h('p', { class: 'hinweis' }, 'Tippe zuerst einen Begriff an, dann die passende Gruppe. Antippen in der Gruppe legt ihn zurück.'), vorrat, spalten,
+      LA.setzen(w, h('h2', null, 'Zuordnen'), h('p', { class: 'hinweis' }, 'Tippe zuerst einen Begriff an, dann die passende Gruppe. Antippen in der Gruppe legt ihn zurück.'), vorrat, spalten,
         h('div', { class: 'reihe' }, h('button', { class: 'knopf', onclick: () => {
           let punkte = 0;
           spalten.querySelectorAll('.kategorie').forEach((sp, ki) => sp.querySelectorAll('.chip').forEach((c) => {
@@ -420,19 +433,19 @@
             try {
               const r = await LA.antwortBewerten({ ...f, antwort: feld.value, stufe: p.stufe });
               const pkt = Math.max(0, Math.min(3, r.punkte)); punkte += pkt;
-              rueck.replaceChildren(h('div', { class: 'punkte' }, '●'.repeat(pkt) + '○'.repeat(3 - pkt), ` ${pkt} / 3`), h('p', null, r.feedback), h('p', null, h('strong', null, 'Tipp: '), r.tipp),
+              LA.setzen(rueck, h('div', { class: 'punkte' }, '●'.repeat(pkt) + '○'.repeat(3 - pkt), ` ${pkt} / 3`), h('p', null, r.feedback), h('p', null, h('strong', null, 'Tipp: '), r.tipp),
                 h('details', null, h('summary', null, 'Musterantwort'), h('p', null, f.musterantwort)));
               weiter.disabled = false;
             } catch (e) { rueck.textContent = e.message; abgeben.disabled = false; }
           } else {
             const selbst = (pkt) => { punkte += pkt; weiter.disabled = false; weiter.click(); };
-            rueck.replaceChildren(h('div', { class: 'label' }, 'Musterantwort'), h('p', null, f.musterantwort),
+            LA.setzen(rueck, h('div', { class: 'label' }, 'Musterantwort'), h('p', null, f.musterantwort),
               h('div', { class: 'label' }, 'Darauf kommt es an'), h('ul', null, f.kriterien.map((k) => h('li', null, k))),
               h('p', null, 'Wie gut war deine Antwort?'), h('div', { class: 'reihe' }, [0, 1, 2, 3].map((n) => h('button', { class: 'knopf sekundaer klein', onclick: () => selbst(n) }, `${n} Punkt${n === 1 ? '' : 'e'}`))));
           }
         });
-        w.replaceChildren(fortschrittsbalken(i, p.offene_fragen.length), h('div', { class: 'label' }, `Frage ${i + 1} von ${p.offene_fragen.length}`),
-          h('div', { class: 'frage' }, f.frage), feld, h('div', { class: 'reihe' }, abgeben), rueck, h('div', { class: 'reihe rechts' }, weiter));
+        LA.setzen(w, fortschrittsbalken(i, p.offene_fragen.length), h('div', { class: 'label' }, `Frage ${i + 1} von ${p.offene_fragen.length}`),
+          h('div', { class: 'frage mit-ton' }, h('span', null, f.frage), LA.vorleseKnopf(f.frage, 'Frage vorlesen')), feld, h('div', { class: 'reihe' }, abgeben), rueck, h('div', { class: 'reihe rechts' }, weiter));
       };
       zeige();
     },
@@ -450,17 +463,17 @@
       feld.addEventListener('input', () => { zaehler.textContent = (feld.value.trim().split(/\s+/).filter(Boolean).length) + ' Wörter'; });
       const ausgabe = h('div', { 'aria-live': 'polite' });
       const knopf = h('button', { class: 'knopf', onclick: async () => {
-        if (!LA.kiVerfuegbar()) { ausgabe.replaceChildren(h('div', { class: 'kasten' }, 'Für die Korrektur braucht es die KI. Die Lehrperson kann in den Einstellungen einen API-Schlüssel hinterlegen.')); return; }
+        if (!LA.kiVerfuegbar()) { LA.setzen(ausgabe, h('div', { class: 'kasten' }, 'Für die Korrektur braucht es die KI. Die Lehrperson kann in den Einstellungen einen API-Schlüssel hinterlegen.')); return; }
         if (feld.value.trim().split(/\s+/).length < 5) { ausgabe.textContent = 'Schreib zuerst etwas mehr.'; return; }
         knopf.disabled = true; ausgabe.textContent = 'Die KI korrigiert deinen Text …';
         try {
           const r = await LA.textKorrigieren({ aufgabe: a.aufgabe, text: feld.value, stufe: p.stufe, fachinhalt: p.kurzbeschreibung + ' ' + p.kapitel.map((k) => k.merksatz).join(' ') });
-          ausgabe.replaceChildren(korrekturAnsicht(feld.value, r));
+          LA.setzen(ausgabe, korrekturAnsicht(feld.value, r));
           fertig(Math.max(0, 10 - r.fehler.length), 10);
         } catch (e) { ausgabe.textContent = e.message; }
         knopf.disabled = false;
       } }, 'Korrigieren lassen');
-      w.replaceChildren(h('h2', null, 'Schreiben & Korrektur'), h('div', { class: 'kasten' }, h('div', { class: 'label' }, 'Auftrag'), a.aufgabe, a.hinweise ? h('p', { class: 'hinweis' }, a.hinweise) : null),
+      LA.setzen(w, h('h2', null, 'Schreiben & Korrektur'), h('div', { class: 'kasten' }, h('div', { class: 'label mit-ton' }, 'Auftrag', LA.vorleseKnopf(a.aufgabe + ' … ' + (a.hinweise || ''), 'Auftrag vorlesen')), a.aufgabe, a.hinweise ? h('p', { class: 'hinweis' }, a.hinweise) : null),
         feld, h('div', { class: 'reihe zwischen' }, zaehler, knopf), ausgabe);
     },
   };

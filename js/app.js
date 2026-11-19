@@ -29,7 +29,7 @@
   /* ---------- Kopfzeile ---------- */
   function kopf() {
     const k = document.getElementById('kopf');
-    k.replaceChildren(
+    LA.setzen(k, 
       h('button', { class: 'marke', onclick: () => (zustand.schuelerModus && zustand.paket ? LA.zurUebersicht() : startAnsicht()) }, h('span', { class: 'marke-zeichen', 'aria-hidden': 'true' }, 'L'), 'Lernwerkstatt'),
       h('nav', null,
         zustand.schuelerModus ? h('span', { class: 'tag' }, 'Schüleransicht') : h('button', { class: 'knopf sekundaer klein', onclick: startAnsicht }, 'Meine Pakete'),
@@ -48,7 +48,7 @@
         paketSpeichern(p); LA.meldung('Paket importiert.'); paketAnsicht(p);
       } catch { LA.meldung('Diese Datei ist kein gültiges Lernpaket.', 'fehler'); }
     } });
-    main().replaceChildren(
+    LA.setzen(main(), 
       h('section', { class: 'held' },
         h('h1', null, 'Aus deinem Material wird eine Lern-App'),
         h('p', { class: 'intro' }, 'Text, PDF oder Foto eines Arbeitsblatts hineingeben. Die KI baut daraus einen Lernpfad mit Erklärungen und wählt passende Übungen: Multiple Choice, Lückentext, Memory, Kreuzworträtsel, Reihenfolge, Zuordnen, Denkfragen und Textkorrektur.'),
@@ -77,14 +77,14 @@
     let modus = LA.kiVerfuegbar() ? 'ki' : 'offline';
     const wurzel = h('div');
     const zeichne = () => {
-      wurzel.replaceChildren(
+      LA.setzen(wurzel, 
         h('div', { class: 'tabs', role: 'tablist' },
           h('button', { role: 'tab', class: 'tab' + (modus === 'ki' ? ' aktiv' : ''), 'aria-selected': modus === 'ki', onclick: () => { modus = 'ki'; zeichne(); } }, 'Mit KI (beliebiges Material)'),
           h('button', { role: 'tab', class: 'tab' + (modus === 'offline' ? ' aktiv' : ''), 'aria-selected': modus === 'offline', onclick: () => { modus = 'offline'; zeichne(); } }, 'Ohne KI (Begriffsliste)')),
         modus === 'ki' ? kiFormular() : offlineFormular());
     };
     zeichne();
-    main().replaceChildren(h('h1', null, 'Neues Lernpaket'), wurzel);
+    LA.setzen(main(), h('h1', null, 'Neues Lernpaket'), wurzel);
   }
 
   function stufenAuswahl(id) {
@@ -98,7 +98,7 @@
     }
     const dateien = [];
     const dateiListe = h('ul', { class: 'dateiliste' });
-    const zeigeDateien = () => dateiListe.replaceChildren(...dateien.map((d, i) => h('li', null, `${d.name} (${Math.round(d.groesse / 1024)} KB)`, h('button', { class: 'mini', 'aria-label': 'entfernen', onclick: () => { dateien.splice(i, 1); zeigeDateien(); } }, '✕'))));
+    const zeigeDateien = () => LA.setzen(dateiListe, ...dateien.map((d, i) => h('li', null, `${d.name} (${Math.round(d.groesse / 1024)} KB)`, h('button', { class: 'mini', 'aria-label': 'entfernen', onclick: () => { dateien.splice(i, 1); zeigeDateien(); } }, '✕'))));
     const dateiInput = h('input', { type: 'file', multiple: true, accept: '.txt,.md,.csv,.pdf,image/png,image/jpeg,image/webp,image/gif', onchange: async (e) => {
       for (const f of e.target.files) {
         if (f.size > 20 * 1024 * 1024) { LA.meldung(`${f.name} ist grösser als 20 MB.`, 'fehler'); continue; }
@@ -119,7 +119,7 @@
       knopf.disabled = true;
       const start = Date.now();
       const tick = setInterval(() => { status.firstChild && (status.firstChild.textContent = `Die KI erstellt das Lernpaket … ${Math.round((Date.now() - start) / 1000)} s`); }, 1000);
-      status.replaceChildren(h('span', null, 'Die KI erstellt das Lernpaket …'), h('span', { class: 'hinweis' }, ' (dauert meist 30–90 Sekunden)'), h('div', { class: 'balken laeuft' }, h('div')));
+      LA.setzen(status, h('span', null, 'Die KI erstellt das Lernpaket …'), h('span', { class: 'hinweis' }, ' (dauert meist 30–90 Sekunden)'), h('div', { class: 'balken laeuft' }, h('div')));
       try {
         const p = await LA.paketErzeugen({ text: material.value.trim(), dateien, fach: fach.value.trim(), stufe: stufe.value, hinweis: hinweis.value.trim(),
           beiFortschritt: (n) => { const s = status.querySelector('.hinweis'); if (s) s.textContent = ` (${n.toLocaleString('de-CH')} Zeichen empfangen)`; } });
@@ -127,7 +127,7 @@
         LA.meldung('Lernpaket erstellt.');
         paketAnsicht(p);
       } catch (e) {
-        status.replaceChildren(h('div', { class: 'rueckmeldung nein' }, e.message));
+        LA.setzen(status, h('div', { class: 'rueckmeldung nein' }, e.message));
       } finally { clearInterval(tick); knopf.disabled = false; }
     } }, 'Lernpaket erstellen');
 
@@ -153,12 +153,13 @@
       h('label', null, 'Erklärtext', text),
       h('button', { class: 'knopf', onclick: () => {
         try { const p = LA.offlinePaket({ titel: titel.value.trim(), begriffsliste: liste.value, text: text.value, stufe: stufe.value }); paketSpeichern(p); paketAnsicht(p); }
-        catch (e) { status.replaceChildren(h('div', { class: 'rueckmeldung nein' }, e.message)); }
+        catch (e) { LA.setzen(status, h('div', { class: 'rueckmeldung nein' }, e.message)); }
       } }, 'Lernpaket erstellen'), status);
   }
 
   /* ---------- Paket-Übersicht ---------- */
   function paketAnsicht(p) {
+    LA.vorlesenStoppen();
     zustand.paket = p; kopf();
     const f = fortschritt(p.id);
     const verfuegbar = p.spiele.filter((s) => LA.SPIELE[s] && LA.SPIELE[s].moeglich(p));
@@ -173,7 +174,7 @@
         st ? h('span', { class: 'spiel-stand', title: `${st.versuche}× gespielt` }, `${st.best}/${st.max}`) : null);
     };
     const istGespeichert = pakete().some((x) => x.id === p.id);
-    main().replaceChildren(
+    LA.setzen(main(), 
       h('div', { class: 'paket-kopf' },
         h('div', null,
           h('div', { class: 'label' }, [p.fach, p.stufe].filter(Boolean).join(' · ')),
@@ -182,6 +183,7 @@
         zustand.schuelerModus ? null : h('div', { class: 'reihe' },
           !istGespeichert ? h('button', { class: 'knopf sekundaer klein', onclick: () => { paketSpeichern(p); paketAnsicht(p); LA.meldung('In «Meine Pakete» gespeichert.'); } }, 'Speichern') : null,
           h('button', { class: 'knopf sekundaer klein', onclick: () => teilen(p) }, 'Teilen'),
+          h('button', { class: 'knopf sekundaer klein', onclick: () => LA.druckDialog(p) }, 'Drucken'),
           h('button', { class: 'knopf sekundaer klein', onclick: () => LA.download(dateiname(p), JSON.stringify(p, null, 2)) }, 'Export'),
           h('button', { class: 'knopf sekundaer klein', onclick: () => bearbeitenAnsicht(p) }, 'Bearbeiten'))),
       lernpfad ? h('section', null, h('div', { class: 'label' }, '1 · Zuerst lernen'), spielKarte('lernpfad', true)) : null,
@@ -238,7 +240,7 @@
     });
     const json = h('textarea', { rows: 18, class: 'mono', spellcheck: 'false' }, JSON.stringify(kopie, null, 2));
     const status = h('div', { 'aria-live': 'polite' });
-    main().replaceChildren(
+    LA.setzen(main(), 
       h('h1', null, 'Paket bearbeiten'),
       h('div', { class: 'formular' },
         h('label', null, 'Titel', titel),
@@ -256,15 +258,16 @@
           json,
           h('button', { class: 'knopf sekundaer', onclick: () => {
             try { const neu = LA.paketPruefen(JSON.parse(json.value)); neu.id = p.id; paketSpeichern(neu); LA.meldung('Inhalte übernommen.'); paketAnsicht(neu); }
-            catch (e) { status.replaceChildren(h('div', { class: 'rueckmeldung nein' }, 'JSON-Fehler: ' + e.message)); }
+            catch (e) { LA.setzen(status, h('div', { class: 'rueckmeldung nein' }, 'JSON-Fehler: ' + e.message)); }
           } }, 'JSON übernehmen'), status)));
   }
 
   /* ---------- Spiel ---------- */
   function spielAnsicht(s) {
+    LA.vorlesenStoppen();
     const p = zustand.paket;
     const flaeche = h('div', { class: 'spielflaeche' });
-    main().replaceChildren(h('button', { class: 'zurueck', onclick: () => paketAnsicht(p) }, '← ' + p.titel), flaeche);
+    LA.setzen(main(), h('button', { class: 'zurueck', onclick: () => paketAnsicht(p) }, '← ' + p.titel), flaeche);
     window.scrollTo({ top: 0 });
     LA.SPIELE[s].start(flaeche, p, (punkte, max) => fortschrittMerken(p.id, s, punkte, max));
   }
@@ -284,7 +287,7 @@
       st.serverKi ? h('p', null, 'Die KI läuft über diesen Server. Der API-Schlüssel liegt dort, nicht im Browser. Lernende brauchen ' + (st.codeNoetig ? 'nur den Klassencode.' : 'nichts weiter.')) : h('p', null, 'Der Server läuft, aber ohne API-Schlüssel (ANTHROPIC_API_KEY fehlt).'),
       st.serverKi && st.codeNoetig ? h('label', null, 'Klassencode', code) : null,
       st.serverKi ? h('p', { class: 'hinweis' }, 'Ein eigener Schlüssel unten hat Vorrang vor dem Server. Für den Server-Modus das Feld leer lassen.') : null) : null;
-    main().replaceChildren(
+    LA.setzen(main(), 
       h('h1', null, 'Einstellungen'),
       h('div', { class: 'formular' },
         serverTeil,
