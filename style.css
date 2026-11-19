@@ -269,3 +269,20 @@ details summary { cursor: pointer; }
   .druck-loesung { break-before: page; }
   .druck-loesung h1 { border-bottom: 1.5pt solid #000; padding-bottom: 3mm; margin-bottom: 5mm !important; }
 }
+
+/* Wiederholen */
+.spiel.faellig { background: var(--warn-soft); border-color: #c8952c; }
+.faellig-tag { align-self: flex-start; background: var(--warn-soft); color: inherit; margin-top: 4px; }
+.faecher { display: inline-flex; gap: 3px; flex: none; }
+.fach-punkt { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--accent); }
+.fach-punkt.voll { background: var(--accent); }
+.eingabe-gross { font-size: 18px; margin: 10px 0; }
+.eingabe-gross.richtig, .luecke.richtig { border-color: var(--ok); background: var(--ok-soft); }
+.eingabe-gross.fast { border-color: #c8952c; background: var(--warn-soft); }
+.eingabe-gross.falsch { border-color: var(--no); background: var(--no-soft); }
+.statistik { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.stat-fach { background: var(--surface-2); border-radius: 10px; padding: 8px; text-align: center; }
+.stat-zahl { font-family: var(--f-mono); font-size: 22px; font-weight: 800; }
+.fehlerliste { padding-left: 22px; display: flex; flex-direction: column; gap: 10px; margin: 0; }
+.fehlerliste li { border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+input.luecke { width: auto; display: inline-block; min-width: 4ch; padding: 2px 6px; border-radius: 6px 6px 0 0; }

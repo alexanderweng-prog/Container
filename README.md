@@ -25,6 +25,26 @@ Die Spiele, die gar nicht zum Inhalt passen (z. B. Reihenfolge ohne Ablauf), ers
 - **Tippfehler**: Im Lückentext zählen kleine Tippfehler («Verdunstug») als richtig, die korrekte Schreibweise wird aber angezeigt. Kurze Wörter (unter 5 Buchstaben) werden streng geprüft, weil sonst «Mehr» für «Meer» durchginge. Umlaute dürfen als ae/oe/ue geschrieben werden.
 - **Kreuzworträtsel**: Ä, Ö, Ü und ß normal tippen, sie werden automatisch auf zwei Felder verteilt (AE, OE, UE, SS).
 
+## Gezielt wiederholen (Lernkartei)
+
+Jede Antwort aus Lernpfad, Multiple Choice, Wahr/Falsch, Lückentext, Kreuzworträtsel und Zuordnen landet in einer Lernkartei mit 5 Fächern (Leitner-System):
+
+| Fach | wieder fällig nach |
+|---|---|
+| 1 (falsch beantwortet) | sofort, noch in derselben Runde |
+| 2 | 1 Tag |
+| 3 | 3 Tagen |
+| 4 | 7 Tagen |
+| 5 (gelernt) | 16 Tagen |
+
+- Richtig, wenn die Karte fällig ist → ein Fach weiter. Falsch → zurück in Fach 1.
+- Richtige Antworten vor dem Fälligkeitstag schieben eine Karte nicht weiter. Wer am selben Tag fünfmal dasselbe übt, hat sie deshalb nicht «gelernt».
+- In der Paketübersicht steht **«Heute zuerst: Wiederholen»**, sobald Karten fällig sind, und auf der Startseite erscheint «🔁 fällig».
+- In der Wiederholung wird abgefragt, nicht wiedererkannt, wo es geht: zum Beispiel «Welcher Fachbegriff ist gemeint?» mit Eingabefeld, mit Tipp-Knopf (Anfangsbuchstabe).
+- Das **Fehlerheft** zeigt alles, was einmal falsch war, mit Lösung und Fach.
+- Nicht in der Kartei: Memory (dort geht es um Kartenpositionen), Reihenfolge (eine Aufgabe als Ganzes) und Denkfragen.
+- Der Lernstand liegt im Browser des Geräts. Wer das Gerät wechselt, fängt neu an.
+
 ## Arbeitsblatt drucken
 
 In der Paketübersicht auf **Drucken**: Teile auswählen, dann im Druckdialog drucken oder «Als PDF speichern». Es entsteht ein A4-Blatt mit Namensfeld und ein Lösungsblatt auf einer neuen Seite. Memory wird auf Papier zu «Begriffe verbinden». Die Reihenfolge der Antworten wird bei jedem Druck neu gemischt, das Lösungsblatt passt immer zum Blatt aus demselben Druckvorgang.
@@ -90,6 +110,7 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt. `js/anthropic-sdk-1.5.0.min.js` i
 - `js/spiele.js` – alle Spieltypen
 - `js/offline.js` – Generator ohne KI und Demo-Paket
 - `js/druck.js` – Arbeitsblatt und Lösungsblatt
+- `js/wiederholen.js` – Lernkartei, Wiederholungsrunde, Fehlerheft
 - `js/app.js` – Ansichten, Speicher, Teilen
 - `server/server.js` – Auslieferung und KI-Weiterleitung mit Schlüssel (ohne Abhängigkeiten)
 - `Dockerfile`, `docker-compose.yml`, `env.beispiel`

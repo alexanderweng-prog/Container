@@ -60,7 +60,7 @@
           k.beispiel ? h('div', { class: 'kasten beispiel' }, h('div', { class: 'label' }, 'Beispiel'), k.beispiel) : null,
           k.merksatz ? h('div', { class: 'kasten merksatz' }, h('div', { class: 'label' }, 'Merksatz'), k.merksatz) : null,
           nachfrage,
-          k.check && k.check.optionen ? h('div', { class: 'kasten' }, h('div', { class: 'label' }, 'Hast du es verstanden?'), mcKarte(k.check, (ok) => { if (ok) punkte++; weiter.disabled = false; })) : (weiter.disabled = false, null),
+          k.check && k.check.optionen ? h('div', { class: 'kasten' }, h('div', { class: 'label' }, 'Hast du es verstanden?'), mcKarte(k.check, (ok) => { LA.melden(p.id, 'kap:' + i, ok); if (ok) punkte++; weiter.disabled = false; })) : (weiter.disabled = false, null),
           h('div', { class: 'reihe rechts' }, weiter));
       };
       zeige();
@@ -93,7 +93,7 @@
         if (i >= fragen.length) { fertig(punkte, fragen.length); return ergebnis(w, punkte, fragen.length, () => SPIELE.multiple_choice.start(w, p, fertig)); }
         const weiter = h('button', { class: 'knopf', disabled: true, onclick: () => { i++; zeige(); } }, 'Weiter');
         LA.setzen(w, fortschrittsbalken(i, fragen.length), h('div', { class: 'label' }, `Frage ${i + 1} von ${fragen.length} · ${punkte} richtig`),
-          mcKarte(fragen[i], (ok) => { if (ok) punkte++; weiter.disabled = false; weiter.focus(); }), h('div', { class: 'reihe rechts' }, weiter));
+          mcKarte(fragen[i], (ok) => { LA.melden(p.id, 'mc:' + p.multiple_choice.indexOf(fragen[i]), ok); if (ok) punkte++; weiter.disabled = false; weiter.focus(); }), h('div', { class: 'reihe rechts' }, weiter));
       };
       zeige();
     },
@@ -107,7 +107,7 @@
       const lt = p.lueckentexte[Math.floor(Math.random() * p.lueckentexte.length)];
       const teile = lt.text.split(/(\{\{.+?\}\})/);
       const felder = [];
-      let aktiv = null;
+      let aktiv = null, gemeldet = false;
       const text = h('div', { class: 'luecken-text' });
       for (const t of teile) {
         const m = t.match(/^\{\{(.+?)\}\}$/);
@@ -130,13 +130,16 @@
       const pruefen = h('button', { class: 'knopf', onclick: () => {
         let punkte = 0;
         const fast = [];
-        for (const f of felder) {
+        const ltNr = p.lueckentexte.indexOf(lt);
+        for (const [n, f] of felder.entries()) {
           const urteil = LA.antwortPruefen(f.value, f.dataset.loesung);
           f.classList.remove('richtig', 'fast', 'falsch'); f.classList.add(urteil);
           f.title = urteil === 'richtig' ? '' : 'Richtig: ' + f.dataset.loesung;
           if (urteil !== 'falsch') punkte++;
+          if (!gemeldet && f.value.trim()) LA.melden(p.id, `lt:${ltNr}:${n}`, urteil !== 'falsch');
           if (urteil === 'fast') fast.push(`«${f.value.trim()}» → ${f.dataset.loesung}`);
         }
+        gemeldet = true;
         fertig(punkte, felder.length);
         LA.setzen(info, `${punkte} von ${felder.length} richtig.` + (punkte < felder.length ? ' Tippe auf rote Felder für die Lösung.' : ''),
           fast.length ? h('div', { class: 'hinweis' }, 'Gezählt, aber achte auf die Schreibweise: ', fast.join(', ')) : '');
@@ -250,6 +253,7 @@
       }
       const { breite, hoehe, woerter } = raetsel;
       const felder = new Map();
+      let kwGemeldet = false, aufgeloest = false;
       const gitter = h('div', { class: 'kw-gitter', style: { gridTemplateColumns: `repeat(${breite}, var(--kw))` } });
       let richtung = { dx: 1, dy: 0 };
       for (let y = 0; y < hoehe; y++) for (let x = 0; x < breite; x++) {
@@ -299,15 +303,17 @@
       const pruefen = h('button', { class: 'knopf', onclick: () => {
         let richtigeWoerter = 0;
         for (const g of woerter) {
-          let ok = true;
-          for (let i = 0; i < g.wort.length; i++) { const f = felder.get((g.x + g.dx * i) + ',' + (g.y + g.dy * i)); if (f.value !== f.dataset.loesung) ok = false; }
+          let ok = true, angefangen = false;
+          for (let i = 0; i < g.wort.length; i++) { const f = felder.get((g.x + g.dx * i) + ',' + (g.y + g.dy * i)); if (f.value !== f.dataset.loesung) ok = false; if (f.value) angefangen = true; }
           if (ok) richtigeWoerter++;
+          if (!kwGemeldet && !aufgeloest && angefangen) LA.melden(p.id, 'begriff:' + p.begriffe.findIndex((b) => b.begriff === g.begriff), ok);
         }
+        kwGemeldet = true;
         felder.forEach((f) => { if (f.value) { f.classList.toggle('richtig', f.value === f.dataset.loesung); f.classList.toggle('falsch', f.value !== f.dataset.loesung); } });
         fertig(richtigeWoerter, woerter.length);
         info.textContent = `${richtigeWoerter} von ${woerter.length} Wörtern richtig.` + (richtigeWoerter === woerter.length ? ' Perfekt!' : '');
       } }, 'Prüfen');
-      const aufloesen = h('button', { class: 'knopf sekundaer', onclick: () => felder.forEach((f) => { f.value = f.dataset.loesung; f.classList.remove('falsch'); }) }, 'Auflösen');
+      const aufloesen = h('button', { class: 'knopf sekundaer', onclick: () => (aufgeloest = true) && felder.forEach((f) => { f.value = f.dataset.loesung; f.classList.remove('falsch'); }) }, 'Auflösen');
       const wrap = h('div', { class: 'kw-wrap' }, gitter);
       // Feldgrösse an verfügbare Breite anpassen (Handy), zwischen 22 und 36 px
       const groesse = () => { if (!gitter.isConnected) return window.removeEventListener('resize', groesse); const px = Math.floor((wrap.clientWidth - 2 * (breite - 1)) / breite); gitter.style.setProperty('--kw', Math.max(18, Math.min(36, px)) + 'px'); };
@@ -334,6 +340,7 @@
         const antwort = (wahl, k) => {
           wk.disabled = fk.disabled = true;
           const ok = wahl === a.wahr; if (ok) punkte++;
+          LA.melden(p.id, 'wf:' + p.wahr_falsch.indexOf(a), ok);
           k.classList.add(ok ? 'richtig' : 'falsch');
           rueck.className = 'rueckmeldung ' + (ok ? 'ok' : 'nein');
           LA.setzen(rueck, h('strong', null, (ok ? 'Richtig – ' : 'Nein – ') + (a.wahr ? 'die Aussage stimmt. ' : 'die Aussage stimmt nicht. ')), a.erklaerung || '');
@@ -384,6 +391,7 @@
       const begriffe = LA.mischen(p.begriffe.filter((b) => b.kategorie)).slice(0, 12);
       const kategorien = [...new Set(begriffe.map((b) => b.kategorie))];
       const zuordnung = new Map();
+      let zuGemeldet = false;
       let gewaehlt = null;
       const vorrat = h('div', { class: 'wortbank' });
       const spalten = h('div', { class: 'kategorien' });
@@ -404,7 +412,10 @@
             const b = begriffe.find((x) => x.begriff === c.textContent && zuordnung.get(x) === kategorien[ki]);
             const ok = b && b.kategorie === kategorien[ki]; if (ok) punkte++;
             c.classList.add(ok ? 'richtig' : 'falsch');
+            const gemeint = begriffe.find((x) => x.begriff === c.textContent);
+            if (!zuGemeldet && gemeint) LA.melden(p.id, 'kat:' + p.begriffe.indexOf(gemeint), !!ok);
           }));
+          zuGemeldet = true;
           fertig(punkte, begriffe.length);
           info.textContent = `${punkte} von ${begriffe.length} richtig zugeordnet.`;
         } }, 'Prüfen'), h('button', { class: 'knopf sekundaer', onclick: () => SPIELE.zuordnen.start(w, p, fertig) }, 'Neu')), info);
@@ -508,5 +519,6 @@
   }
 
   LA.SPIELE = SPIELE;
+  LA.mcKarte = mcKarte;
   LA.kreuzwortBauen = kreuzwortBauen;
 })(window.LA);

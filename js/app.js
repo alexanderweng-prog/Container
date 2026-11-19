@@ -16,6 +16,7 @@
   function paketLoeschen(id) {
     LA.speicher.schreiben(PAKETE_KEY, pakete().filter((x) => x.id !== id));
     LA.speicher.loeschen('lernapp.fortschritt.' + id);
+    LA.lernstandLoeschen(id);
   }
   const fortschritt = (id) => LA.speicher.lesen('lernapp.fortschritt.' + id, {});
   function fortschrittMerken(id, spiel, punkte, max) {
@@ -61,11 +62,13 @@
         liste.length ? h('div', { class: 'karten' }, liste.map((p) => {
           const f = fortschritt(p.id);
           const erledigt = Object.keys(f).length;
+          const faellig = LA.lernstand(p).faellig.length;
           return h('button', { class: 'karte', onclick: () => paketAnsicht(p) },
             h('div', { class: 'label' }, [p.fach, p.stufe].filter(Boolean).join(' · ') || 'Lernpaket'),
             h('div', { class: 'karte-titel' }, p.titel),
             h('div', { class: 'hinweis' }, p.kurzbeschreibung),
-            h('div', { class: 'hinweis' }, `${p.spiele.length} Spiele · ${erledigt} gespielt${p.quelle === 'offline' ? ' · ohne KI' : ''}`));
+            h('div', { class: 'hinweis' }, `${p.spiele.length} Spiele · ${erledigt} gespielt${p.quelle === 'offline' ? ' · ohne KI' : ''}`),
+            faellig ? h('span', { class: 'tag faellig-tag' }, `🔁 ${faellig} fällig`) : null);
         })) : h('p', { class: 'hinweis' }, 'Noch keine Pakete. Erstelle eines oder schau dir die Demo an.')));
   }
 
@@ -174,6 +177,17 @@
         st ? h('span', { class: 'spiel-stand', title: `${st.versuche}× gespielt` }, `${st.best}/${st.max}`) : null);
     };
     const istGespeichert = pakete().some((x) => x.id === p.id);
+    const ls = LA.lernstand(p);
+    const wiederholenBereich = h('section', null, h('div', { class: 'label' }, ls.faellig.length ? 'Heute zuerst' : (lernpfad ? '3 · ' : '') + 'Wiederholen'),
+      h('div', { class: 'spiele' },
+        h('button', { class: 'spiel' + (ls.faellig.length ? ' gross faellig' : ''), onclick: () => spielAnsicht('wiederholen') },
+          h('span', { class: 'spiel-symbol', 'aria-hidden': 'true' }, '🔁'),
+          h('span', { class: 'spiel-text' }, h('span', { class: 'spiel-name' }, ls.faellig.length ? `Wiederholen: ${ls.faellig.length} Karte${ls.faellig.length === 1 ? '' : 'n'} fällig` : 'Wiederholen'),
+            h('span', { class: 'hinweis' }, ls.faellig.length ? 'Was du falsch hattest oder länger nicht gesehen hast.' : 'Heute ist nichts fällig.'))),
+        h('button', { class: 'spiel', onclick: () => spielAnsicht('fehlerheft') },
+          h('span', { class: 'spiel-symbol', 'aria-hidden': 'true' }, '📒'),
+          h('span', { class: 'spiel-text' }, h('span', { class: 'spiel-name' }, 'Fehlerheft'),
+            h('span', { class: 'hinweis' }, `${ls.fehler.length} Karte${ls.fehler.length === 1 ? '' : 'n'} mit Fehlern · ${ls.faecher[5]} gelernt`)))));
     LA.setzen(main(), 
       h('div', { class: 'paket-kopf' },
         h('div', null,
@@ -186,9 +200,12 @@
           h('button', { class: 'knopf sekundaer klein', onclick: () => LA.druckDialog(p) }, 'Drucken'),
           h('button', { class: 'knopf sekundaer klein', onclick: () => LA.download(dateiname(p), JSON.stringify(p, null, 2)) }, 'Export'),
           h('button', { class: 'knopf sekundaer klein', onclick: () => bearbeitenAnsicht(p) }, 'Bearbeiten'))),
+      // Fällige Wiederholungen zuerst: Abrufen vor Neuem
+      ls.faellig.length ? wiederholenBereich : null,
       lernpfad ? h('section', null, h('div', { class: 'label' }, '1 · Zuerst lernen'), spielKarte('lernpfad', true)) : null,
       h('section', null, h('div', { class: 'label' }, (lernpfad ? '2 · ' : '') + 'Dann üben'),
         h('div', { class: 'spiele' }, uebungen.map((s) => spielKarte(s)))),
+      !ls.faellig.length && ls.gesehen ? wiederholenBereich : null,
       p.spiele_begruendung && !zustand.schuelerModus ? h('p', { class: 'hinweis begruendung' }, h('strong', null, 'Warum diese Spiele? '), p.spiele_begruendung) : null);
   }
   LA.zurUebersicht = () => paketAnsicht(zustand.paket);
@@ -269,6 +286,8 @@
     const flaeche = h('div', { class: 'spielflaeche' });
     LA.setzen(main(), h('button', { class: 'zurueck', onclick: () => paketAnsicht(p) }, '← ' + p.titel), flaeche);
     window.scrollTo({ top: 0 });
+    if (s === 'wiederholen') return LA.wiederholenStarten(flaeche, p, () => {});
+    if (s === 'fehlerheft') return LA.fehlerheft(flaeche, p);
     LA.SPIELE[s].start(flaeche, p, (punkte, max) => fortschrittMerken(p.id, s, punkte, max));
   }
 
