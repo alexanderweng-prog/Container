@@ -12,6 +12,8 @@ const API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const KLASSEN_CODE = process.env.KLASSEN_CODE || '';           // leer = kein Code nötig
 const UPSTREAM = (process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com').replace(/\/$/, '');
 const LIMIT_PRO_STUNDE = Number(process.env.LIMIT_PRO_STUNDE || 60); // KI-Anfragen pro Gerät (IP) und Stunde
+// Nur hinter einem eigenen Proxy (z. B. Caddy) einschalten: Sonst könnte jede Person den Header fälschen und das Limit umgehen.
+const PROXY_VERTRAUEN = process.env.PROXY_VERTRAUEN === '1';
 const ERLAUBTE_MODELLE = (process.env.MODELLE || 'claude-opus-5-5,claude-sonnet-5-5,claude-haiku-5-5').split(',').map((s) => s.trim());
 const MAX_TOKENS = 32000;
 const MAX_BODY = 32 * 1024 * 1024; // PDFs kommen als Base64
@@ -49,7 +51,9 @@ async function kiWeiterleiten(req, res, pfad) {
   if (!API_KEY) return fehler(res, 503, 'Auf dem Server ist kein ANTHROPIC_API_KEY gesetzt.');
   if (req.method !== 'POST' || pfad !== '/v1/messages') return fehler(res, 404, 'Nur /v1/messages ist freigegeben.');
   if (KLASSEN_CODE && req.headers['x-klassen-code'] !== KLASSEN_CODE) return fehler(res, 401, 'Klassencode fehlt oder ist falsch.');
-  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress;
+  // Hinter Caddy steht die echte Adresse im letzten Eintrag von X-Forwarded-For (den setzt Caddy selbst)
+  const weitergeleitet = PROXY_VERTRAUEN ? String(req.headers['x-forwarded-for'] || '').split(',').pop().trim() : '';
+  const ip = weitergeleitet || req.socket.remoteAddress;
   if (limitErreicht(ip)) return fehler(res, 429, 'Stundenlimit für KI-Anfragen erreicht.');
 
   let body;
@@ -98,6 +102,7 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`Lernwerkstatt läuft auf Port ${PORT}`);
   console.log(API_KEY ? 'KI über Server: aktiv' : 'KI über Server: AUS (ANTHROPIC_API_KEY fehlt)');
+  if (PROXY_VERTRAUEN) console.log('Proxy-Modus: Absender-IP aus X-Forwarded-For');
   console.log(KLASSEN_CODE ? 'Klassencode: aktiv' : 'Klassencode: keiner (jede Person mit Zugriff auf die Adresse kann die KI nutzen)');
 });
 process.on('SIGTERM', () => server.close(() => process.exit(0)));

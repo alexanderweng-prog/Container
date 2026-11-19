@@ -1,0 +1,20 @@
+# Caddy: HTTPS vor der Lernwerkstatt. Das Zertifikat (Let's Encrypt) holt und erneuert Caddy selbst.
+# DOMAIN kommt aus der Datei .env, z. B. DOMAIN=lernen.meine-schule.ch
+{$DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy lernwerkstatt:8080
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		X-Frame-Options "DENY"
+		-Server
+	}
+
+	# PDFs und Bilder werden als Base64 geschickt; mehr als der Server annimmt, braucht es nicht
+	request_body {
+		max_size 33MB
+	}
+}

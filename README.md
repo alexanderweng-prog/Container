@@ -89,7 +89,7 @@ cp env.beispiel .env        # Schlüssel und Klassencode eintragen
 docker compose up -d        # danach: http://localhost:8080
 ```
 
-Läuft auf allem, was Docker kann: eigener PC, NAS (Synology, QNAP), Raspberry Pi oder ein Mietserver. Damit die Lernenden darauf zugreifen können, muss der Container für ihre Geräte erreichbar sein, z. B. im Schulnetz oder über das Internet mit HTTPS (z. B. über einen Reverse Proxy wie Caddy).
+Läuft auf allem, was Docker kann: eigener PC, NAS (Synology, QNAP), Raspberry Pi oder ein Mietserver. So gestartet ist die App nur über `http://` erreichbar. Das reicht zum Ausprobieren und im eigenen Netz. Für den Zugriff über das Internet siehe «Über das Internet erreichbar machen (HTTPS)».
 
 | Variable | Bedeutung |
 |---|---|
@@ -101,6 +101,27 @@ Läuft auf allem, was Docker kann: eigener PC, NAS (Synology, QNAP), Raspberry P
 Was der Server erzwingt: nur `/v1/messages`, nur freigegebene Modelle, höchstens 32 000 Ausgabe-Tokens pro Anfrage, Klassencode und Stundenlimit. Der Server-Code selbst wird nicht ausgeliefert.
 
 Ohne Docker geht es auch mit Node.js ab Version 20: `ANTHROPIC_API_KEY=… KLASSEN_CODE=… node server/server.js`.
+
+## Über das Internet erreichbar machen (HTTPS)
+
+Ohne HTTPS gehen Klassencode und Schülertexte unverschlüsselt durchs Netz. Für den Zugriff von ausserhalb des eigenen Netzes deshalb immer die HTTPS-Variante nehmen:
+
+```bash
+cp env.beispiel .env      # Schlüssel, Klassencode und DOMAIN eintragen
+docker compose -f docker-compose.https.yml up -d
+```
+
+Davor steht dann **Caddy**: Es holt das Zertifikat bei Let's Encrypt automatisch, erneuert es selbst und leitet `http://` auf `https://` um. Die App selbst ist dabei nicht mehr direkt erreichbar, nur noch über Caddy.
+
+Was du brauchst:
+
+1. **Eine Domain oder Subdomain**, die auf den Rechner zeigt (DNS-Eintrag Typ A auf seine öffentliche IP), z. B. `lernen.deine-domain.ch`. Bei einem Mietserver bekommst du die IP vom Anbieter.
+2. **Offene Ports 80 und 443.** Zu Hause oder in der Schule muss der Router sie an den Rechner weiterleiten. Im Schulnetz entscheidet das die Informatik der Schule, nicht du.
+3. Beim ersten Start einige Sekunden Geduld, bis das Zertifikat da ist. Falls es nicht klappt: `docker compose -f docker-compose.https.yml logs caddy` zeigt den Grund (meist DNS noch nicht aktiv oder Port 80 zu).
+
+Ausprobieren ohne Domain: `DOMAIN=localhost` erzeugt ein lokales Zertifikat. Der Browser warnt dann, das ist dort normal.
+
+Hinter Caddy liest der Server die echte Absender-Adresse aus dem Header `X-Forwarded-For` (Variable `PROXY_VERTRAUEN=1`, in der HTTPS-Datei schon gesetzt). Ohne Proxy davor bleibt das aus. Sonst könnte jemand den Header fälschen und so das Stundenlimit umgehen.
 
 ## Tests
 
@@ -129,3 +150,4 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt. `js/anthropic-sdk-1.5.0.min.js` i
 - `js/app.js` – Ansichten, Speicher, Teilen
 - `server/server.js` – Auslieferung und KI-Weiterleitung mit Schlüssel (ohne Abhängigkeiten)
 - `Dockerfile`, `docker-compose.yml`, `env.beispiel`
+- `docker-compose.https.yml`, `Caddyfile` – Variante mit HTTPS

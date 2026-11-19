@@ -42,3 +42,34 @@ jobs:
           for i in $(seq 1 20); do curl -fs http://127.0.0.1:8080/api/status && break; sleep 1; done
           curl -fs http://127.0.0.1:8080/ | grep -q "<title>Lernwerkstatt</title>"
           docker rm -f lw
+
+  https:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DOMAIN: localhost
+      KLASSEN_CODE: ci
+      LIMIT_PRO_STUNDE: "2"
+    steps:
+      - uses: actions/checkout@v4
+      - name: HTTPS-Variante starten (Caddy mit lokalem Zertifikat)
+        run: docker compose -f docker-compose.https.yml up -d --build
+      - name: HTTPS, Umleitung, Sicherheits-Header, Port 8080 geschlossen
+        run: |
+          for i in $(seq 1 30); do curl -skf https://localhost/api/status && break; sleep 1; done
+          curl -skI https://localhost/ | grep -qi "strict-transport-security"
+          curl -sI http://localhost/ | grep -qi "location: https://localhost/"
+          ! curl -s -m 3 http://localhost:8080/
+      - name: Gefälschter X-Forwarded-For umgeht das Limit nicht
+        run: |
+          codes=""
+          for i in 1 2 3; do
+            codes="$codes $(curl -sk -o /dev/null -w '%{http_code}' -X POST https://localhost/api/anthropic/v1/messages \
+              -H 'x-klassen-code: ci' -H "x-forwarded-for: 10.0.0.$i" -H 'content-type: application/json' \
+              -d '{"model":"claude-haiku-5-5","max_tokens":5,"messages":[]}')"
+          done
+          echo "Antworten:$codes"
+          [ "$(echo $codes | awk '{print $3}')" = "429" ]
+      - name: Aufräumen
+        if: always()
+        run: docker compose -f docker-compose.https.yml down -v

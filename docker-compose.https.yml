@@ -1,0 +1,35 @@
+# Lernwerkstatt mit HTTPS (für den Zugriff über das Internet).
+# Voraussetzungen: eine Domain, die auf diesen Rechner zeigt, und offene Ports 80 und 443.
+# Start:  docker compose -f docker-compose.https.yml up -d   →  https://DEINE-DOMAIN
+services:
+  lernwerkstatt:
+    build: .
+    image: lernwerkstatt:latest
+    restart: unless-stopped
+    # kein «ports»: nur Caddy ist von aussen erreichbar
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      KLASSEN_CODE: ${KLASSEN_CODE:-}
+      LIMIT_PRO_STUNDE: ${LIMIT_PRO_STUNDE:-60}
+      MODELLE: ${MODELLE:-claude-opus-5-5,claude-sonnet-5-5,claude-haiku-5-5}
+      PROXY_VERTRAUEN: "1"
+
+  caddy:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    depends_on:
+      - lernwerkstatt
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?Bitte DOMAIN in der Datei .env setzen}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_daten:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_daten:
+  caddy_config:

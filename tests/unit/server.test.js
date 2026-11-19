@@ -88,4 +88,7 @@ test('Stundenlimit pro Gerät', async () => {
   assert.deepEqual(codes, [200, 429, 429]);
   const r = await ki({ model: 'claude-haiku-5-5', max_tokens: 10, messages: [] }, { 'x-klassen-code': 'wasser7b' });
   assert.match((await r.json()).error.message, /Stundenlimit/);
+  // Ohne Proxy-Modus darf ein selbst gesetzter X-Forwarded-For-Header das Limit nicht umgehen
+  const gefaelscht = await ki({ model: 'claude-haiku-5-5', max_tokens: 10, messages: [] }, { 'x-klassen-code': 'wasser7b', 'x-forwarded-for': '10.9.9.9' });
+  assert.equal(gefaelscht.status, 429);
 });
