@@ -192,6 +192,7 @@
     zustand.paket = p; kopf();
     niveauMerken(p);
     const gruppe = gruppeVon(p);
+    const empfohlen = LA.flowEmpfehlung(gruppe);
     const f = fortschritt(p.id);
     const verfuegbar = p.spiele.filter((s) => LA.SPIELE[s] && LA.SPIELE[s].moeglich(p));
     const lernpfad = verfuegbar.includes('lernpfad');
@@ -223,7 +224,7 @@
           h('h1', null, p.titel),
           h('p', { class: 'intro' }, p.kurzbeschreibung),
           gruppe.length > 1 ? h('div', { class: 'niveaus', role: 'tablist', 'aria-label': 'Niveau wählen' }, gruppe.map((x) =>
-            h('button', { role: 'tab', class: 'niveau-tab' + (x.id === p.id ? ' aktiv' : ''), 'aria-selected': x.id === p.id, onclick: () => paketAnsicht(x) },
+            h('button', { role: 'tab', class: 'niveau-tab' + (x.id === p.id ? ' aktiv' : '') + (empfohlen && empfohlen.id === x.id ? ' empfohlen' : ''), 'aria-selected': x.id === p.id, title: empfohlen && empfohlen.id === x.id ? 'Passt laut Flow-Training gerade zu dir' : null, onclick: () => paketAnsicht(x) },
               h('span', { class: 'niveau-zeichen' }, LA.NIVEAUS[x.niveau].zeichen), ' ', zustand.schuelerModus ? LA.NIVEAUS[x.niveau].name : `${LA.NIVEAUS[x.niveau].name} · ${LA.NIVEAUS[x.niveau].lang}`))) : null),
         zustand.schuelerModus ? null : h('div', { class: 'reihe' },
           !istGespeichert ? h('button', { class: 'knopf sekundaer klein', onclick: () => { paketSpeichern(p); paketAnsicht(p); LA.meldung('In «Meine Pakete» gespeichert.'); } }, 'Speichern') : null,
@@ -240,11 +241,17 @@
       ls.faellig.length ? wiederholenBereich : null,
       lernpfad ? h('section', null, h('div', { class: 'label' }, '1 · Zuerst lernen'), spielKarte('lernpfad', true)) : null,
       h('section', null, h('div', { class: 'label' }, (lernpfad ? '2 · ' : '') + 'Dann üben'),
+        LA.flowVorrat(gruppe).length >= 4 ? h('button', { class: 'spiel gross flow-karte', onclick: () => spielAnsicht('flow') },
+          h('span', { class: 'spiel-symbol', 'aria-hidden': 'true' }, '🎯'),
+          h('span', { class: 'spiel-text' }, h('span', { class: 'spiel-name' }, 'Flow-Training'),
+            h('span', { class: 'hinweis' }, 'Fragen aus allen Spielen' + (gruppe.length > 1 ? ' und allen Niveaus' : '') + ' – immer so schwer, dass du gefordert, aber nicht überfordert bist.')),
+          LA.flowStufe(gruppe) ? h('span', { class: 'spiel-stand', title: 'Deine Stufe im Flow-Training' }, `Stufe ${LA.flowStufe(gruppe)}`) : null) : null,
         h('div', { class: 'spiele' }, uebungen.map((s) => spielKarte(s)))),
       !ls.faellig.length && ls.gesehen ? wiederholenBereich : null,
       p.spiele_begruendung && !zustand.schuelerModus ? h('p', { class: 'hinweis begruendung' }, h('strong', null, 'Warum diese Spiele? '), p.spiele_begruendung) : null);
   }
   LA.zurUebersicht = () => paketAnsicht(zustand.paket);
+  LA.zustandPaketId = () => zustand.paket && zustand.paket.id;
 
   async function niveausErzeugen(p, statusZiel) {
     const status = statusZiel || h('div', { class: 'status', 'aria-live': 'polite' });
@@ -342,6 +349,7 @@
     window.scrollTo({ top: 0 });
     if (s === 'wiederholen') return LA.wiederholenStarten(flaeche, p, () => {});
     if (s === 'fehlerheft') return LA.fehlerheft(flaeche, p);
+    if (s === 'flow') return LA.flowStarten(flaeche, gruppeVon(p), { niveauWechseln: (x) => paketAnsicht(x), lernpfadOeffnen: p.kapitel.length ? () => spielAnsicht('lernpfad') : null });
     LA.SPIELE[s].start(flaeche, p, (punkte, max) => fortschrittMerken(p.id, s, punkte, max));
   }
 

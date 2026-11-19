@@ -47,6 +47,19 @@ Ein Paket kann es in drei Fassungen geben: **Niveau 1 ●** (grundlegend: einfac
 - In der Schüleransicht stehen nur «Niveau 1 / 2 / 3», ohne «grundlegend» oder «erweitert».
 - Die KI-Fassungen bitte durchsehen. Ob die Niveaus für deine Klasse passend abgestuft sind, kann nur der Einsatz zeigen.
 
+## Flow-Training (passt sich an)
+
+**🎯 Flow-Training** mischt Fragen aus allen Spielen und wählt jede nächste Frage so, dass sie mit etwa 80 % Wahrscheinlichkeit gelöst wird. Das ist dasselbe Modell wie im Flow-Trainer (Elo/Rasch):
+
+- Die lernende Person hat ein **Können** (Stufe 1–10), jede Frage eine **Schwierigkeit**. Nach jeder Antwort rücken beide nach: Wer richtig antwortet, steigt, und eine Frage, die oft falsch beantwortet wird, gilt danach als schwerer.
+- Wie im Flow-Trainer gilt: Nach zwei Fehlern kommt eine leichtere Frage, nach fünf richtigen eine schwerere, und jede siebte Frage ist eine **⚡ Herausforderung**. Die Anzeige zeigt die Flow-Zone (70–90 % richtig in den letzten 10 Antworten).
+- **Die Schwierigkeit einer Frage schätzt die App zu Beginn** aus dem Aufgabentyp (Wahr/Falsch leicht, Begriff selbst eintippen schwer), aus der Einschätzung der KI (1–5, im Editor änderbar) und aus dem Niveau des Pakets.
+- **Mit Niveaus** zieht das Flow-Training Fragen aus allen drei Niveaus. Die Lernenden wandern so automatisch dorthin, wo es für sie passt. Nach mindestens 10 Antworten zeigt die Übersicht mit ★ an, welches Niveau gerade passt.
+- Die Antworten fliessen auch in die Lernkartei.
+- Eine Runde hat 12 Fragen. Wer unter 50 % bleibt, bekommt den Hinweis, zuerst den Lernpfad nochmals anzuschauen.
+
+Grenzen: Die App kann keine leichteren oder schwereren Fragen erfinden, als im Paket stehen. Ganz schwache oder ganz starke Lernende stossen deshalb an den Rand des Fragenvorrats. Pakete mit drei Niveaus haben dafür die grösste Spannweite. Die Schätzung des Könnens gilt pro Gerät und pro Paket bzw. Niveau-Gruppe. In einer Simulation mit virtuellen Lernenden (siehe `tests/unit/flow.test.js`) lag die Schätzung im Schnitt 3–4 Punkte neben dem wahren Können (Skala 0–100), die Erfolgsquote bei 75–80 %. Wie gut das mit echten Klassen funktioniert, ist nicht geprüft.
+
 ## Gezielt wiederholen (Lernkartei)
 
 Jede Antwort aus Lernpfad, Multiple Choice, Wahr/Falsch, Lückentext, Kreuzworträtsel und Zuordnen landet in einer Lernkartei mit 5 Fächern (Leitner-System):
@@ -170,6 +183,7 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt. `js/anthropic-sdk-1.5.0.min.js` i
 - `js/druck.js` – Arbeitsblatt und Lösungsblatt
 - `js/wiederholen.js` – Lernkartei, Wiederholungsrunde, Fehlerheft
 - `js/editor.js` – Bearbeiten ohne JSON, Elemente mit KI neu erzeugen
+- `js/flow.js` – Flow-Training (adaptives Modell)
 - `js/app.js` – Ansichten, Speicher, Teilen
 - `server/server.js` – Auslieferung und KI-Weiterleitung mit Schlüssel (ohne Abhängigkeiten)
 - `Dockerfile`, `docker-compose.yml`, `env.beispiel`

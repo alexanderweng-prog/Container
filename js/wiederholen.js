@@ -131,6 +131,7 @@
       [1, 2, 3, 4, 5].map((n) => h('span', { class: 'fach-punkt' + (n <= fach ? ' voll' : '') })));
   }
   LA.fachAnzeige = fachAnzeige;
+  LA.karteAnzeigen = (k, antwort) => karteAnzeigen(k, antwort);
 
   function naechsteTermine(p) {
     const st = LA.lernstand(p), t = heute();

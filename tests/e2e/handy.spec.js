@@ -7,7 +7,7 @@ test('Kein seitliches Scrollen in Übersicht und Spielen', async ({ page }) => {
   await demoOeffnen(page);
   const ueberlauf = () => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(await ueberlauf()).toBeLessThanOrEqual(0);
-  for (const spiel of ['Lernpfad', 'Kreuzworträtsel', 'Memory', 'Lückentext', 'Zuordnen', 'Reihenfolge']) {
+  for (const spiel of ['Lernpfad', 'Flow-Training', 'Kreuzworträtsel', 'Memory', 'Lückentext', 'Zuordnen', 'Reihenfolge']) {
     await spielOeffnen(page, spiel);
     expect(await ueberlauf(), spiel).toBeLessThanOrEqual(0);
     await zurueck(page);

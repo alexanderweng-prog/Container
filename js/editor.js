@@ -30,7 +30,14 @@
     return h('label', { class: 'ed-feld breit' }, h('span', null, label + ' (eine pro Zeile)'), el);
   }
 
-  function mcEditor(q, zeichne) {
+  function stufenWahl(el) {
+    const w = h('select', { 'aria-label': 'Schwierigkeit', onchange: (e) => { if (e.target.value) el.schwierigkeit = Number(e.target.value); else delete el.schwierigkeit; } },
+      h('option', { value: '' }, 'automatisch'),
+      [1, 2, 3, 4, 5].map((n) => h('option', { value: n, selected: el.schwierigkeit === n }, `${n} – ${['sehr leicht', 'leicht', 'mittel', 'schwer', 'sehr schwer'][n - 1]}`)));
+    return h('label', { class: 'ed-feld' }, h('span', null, 'Schwierigkeit (für das Flow-Training)'), w);
+  }
+
+  function mcEditor(q, zeichne, mitStufe) {
     const name = 'r' + LA.id();
     return h('div', { class: 'ed-mc' },
       feld(q, 'frage', 'Frage', { breit: true }),
@@ -45,7 +52,8 @@
             zeichne();
           } }, '✕') : null)),
         q.optionen.length < 6 ? h('button', { class: 'knopf sekundaer klein', type: 'button', onclick: () => { q.optionen.push(''); zeichne(); } }, '+ Antwort') : null),
-      feld(q, 'erklaerung', 'Erklärung (erscheint nach der Antwort)', { breit: true }));
+      feld(q, 'erklaerung', 'Erklärung (erscheint nach der Antwort)', { breit: true }),
+      mitStufe ? stufenWahl(q) : null);
   }
 
   function lueckenInfo(text) {
@@ -65,7 +73,7 @@
       ];
       case 'begriffe': return [h('div', { class: 'ed-drei' },
         feld(el, 'begriff', 'Begriff'), feld(el, 'erklaerung', 'Erklärung (ohne den Begriff)'), feld(el, 'kategorie', 'Gruppe (für Zuordnen)'))];
-      case 'multiple_choice': return [mcEditor(el, zeichne)];
+      case 'multiple_choice': return [mcEditor(el, zeichne, true)];
       case 'lueckentexte': {
         const info = h('div', { class: 'hinweis' }, lueckenInfo(el.text));
         const ta = feld(el, 'text', 'Text', { zeilen: 6, ohneLabel: true, beiAenderung: () => { info.textContent = lueckenInfo(el.text); } });
@@ -88,7 +96,7 @@
       case 'wahr_falsch': {
         const wahl = h('select', { 'aria-label': 'Stimmt die Aussage?', onchange: (e) => { el.wahr = e.target.value === 'wahr'; } },
           h('option', { value: 'wahr', selected: el.wahr }, 'stimmt'), h('option', { value: 'falsch', selected: !el.wahr }, 'stimmt nicht'));
-        return [feld(el, 'aussage', 'Aussage', { breit: true }), h('label', { class: 'ed-feld' }, h('span', null, 'Die Aussage …'), wahl), feld(el, 'erklaerung', 'Erklärung', { breit: true })];
+        return [feld(el, 'aussage', 'Aussage', { breit: true }), h('div', { class: 'zwei' }, h('label', { class: 'ed-feld' }, h('span', null, 'Die Aussage …'), wahl), stufenWahl(el)), feld(el, 'erklaerung', 'Erklärung', { breit: true })];
       }
       case 'reihenfolgen': return [feld(el, 'titel', 'Auftrag', { breit: true }), zeilenFeld(el, 'schritte', 'Schritte in der richtigen Reihenfolge', 6)];
       case 'offene_fragen': return [feld(el, 'frage', 'Frage', { breit: true }), feld(el, 'musterantwort', 'Musterantwort', { zeilen: 3, breit: true }), zeilenFeld(el, 'kriterien', 'Bewertungskriterien', 3)];
