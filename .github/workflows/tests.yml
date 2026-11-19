@@ -1,0 +1,44 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Logik- und Server-Tests
+        run: npm run test:logik
+      - name: Browser installieren
+        run: npx playwright install --with-deps chromium
+      - name: Browser-Tests
+        run: npm run test:browser
+      - name: Bericht bei Fehlern hochladen
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-bericht
+          path: playwright-report/
+          retention-days: 14
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Image bauen
+        run: docker build -t lernwerkstatt:ci .
+      - name: Container startet und liefert die App aus
+        run: |
+          docker run -d --name lw -p 8080:8080 lernwerkstatt:ci
+          for i in $(seq 1 20); do curl -fs http://127.0.0.1:8080/api/status && break; sleep 1; done
+          curl -fs http://127.0.0.1:8080/ | grep -q "<title>Lernwerkstatt</title>"
+          docker rm -f lw

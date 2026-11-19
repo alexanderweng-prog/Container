@@ -102,6 +102,21 @@ Was der Server erzwingt: nur `/v1/messages`, nur freigegebene Modelle, höchsten
 
 Ohne Docker geht es auch mit Node.js ab Version 20: `ANTHROPIC_API_KEY=… KLASSEN_CODE=… node server/server.js`.
 
+## Tests
+
+```bash
+npm install                          # einmalig
+npx playwright install chromium      # einmalig, lädt den Test-Browser
+npm test                             # alles
+npm run test:logik                   # nur die schnellen Tests (ohne Browser, ca. 1 s)
+npm run test:browser                 # nur die Browser-Tests (ca. 10 s)
+```
+
+- **Logik und Server** (`tests/unit/`): Tippfehler-Erkennung, Kreuzworträtsel-Bau (keine ungewollten Buchstabenreihen), Begriffsliste, Lernkartei (Fächer, Fälligkeit, kein Befördern durch Pauken), Paketprüfung sowie der Schlüssel-Server (Klassencode, Modelle, Token-Grenze, Stundenlimit, kein Zugriff auf fremde Dateien, Schlüssel aus dem Browser wird nicht weitergegeben).
+- **Browser** (`tests/e2e/`): alle Spiele, Paket ohne KI, Teilen-Link, Bearbeiten, Lernkartei, Druckversion, Handyansicht. Die KI wird dabei simuliert. Die Tests kosten also nichts und brauchen keinen Schlüssel.
+- Auf GitHub laufen die Tests bei jedem Push automatisch (Reiter «Actions»), zusätzlich wird das Docker-Image gebaut und gestartet.
+- Nicht getestet wird die echte KI: ob ihre Pakete inhaltlich gut sind, lässt sich nur von Hand beurteilen.
+
 ## Technik
 
 Reines HTML/CSS/JavaScript ohne Build-Schritt. `js/anthropic-sdk-1.5.0.min.js` ist die offizielle Anthropic-SDK (`@anthropic-ai/sdk@1.5.0`), gebündelt für den Browser.
