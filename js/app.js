@@ -287,28 +287,74 @@
   async function teilen(p) {
     const gruppe = gruppeVon(p);
     const basis = location.href.split('#')[0];
-    const feld = h('textarea', { rows: 4, readonly: true });
+    let auswahl = gruppe.length > 1 ? gruppe : p;
+
+    /* Kurzlink mit QR-Code (empfohlen) */
+    const kurz = h('div', { class: 'kurz-bereich' });
+    const kurzZeigen = (code) => {
+      const url = LA.kurzlinkUrl(code);
+      LA.setzen(kurz,
+        h('div', { class: 'kurz-ergebnis' },
+          h('div', { class: 'qr-klein', html: LA.qrSvg(url) }),
+          h('div', { class: 'kurz-text' },
+            h('div', { class: 'label' }, 'Kurzlink'),
+            h('input', { type: 'text', readonly: true, value: url, class: 'kurz-url', 'aria-label': 'Kurzlink', onclick: (e) => e.target.select() }),
+            h('div', { class: 'reihe' },
+              h('button', { class: 'knopf', onclick: async () => { try { await navigator.clipboard.writeText(url); LA.meldung('Link kopiert.'); } catch { LA.meldung('Bitte manuell kopieren (Ctrl+C).'); } } }, 'Link kopieren'),
+              h('button', { class: 'knopf sekundaer', onclick: () => LA.qrVollbild(url, p.titel) }, 'QR gross für Beamer')),
+            h('p', { class: 'hinweis' }, 'Änderungen, die du später im Editor speicherst, kommen automatisch bei allen an, die diesen Link öffnen.'))));
+    };
+    const kurzVorbereiten = async () => {
+      if (!LA.kurzlinkMoeglich()) {
+        LA.setzen(kurz, h('p', { class: 'hinweis' }, location.protocol === 'file:' ? 'Kurzlinks gibt es nur, wenn die App über eine Webadresse läuft.' : 'Kurzlinks sind nicht eingerichtet.'));
+        return;
+      }
+      const vorhanden = LA.kurzlinkVorhanden(auswahl);
+      if (vorhanden) {
+        kurzZeigen(vorhanden.code);
+        // Inhalt still auf den neuesten Stand bringen
+        LA.kurzlinkAktualisieren(auswahl).catch(() => {});
+        return;
+      }
+      const knopf = h('button', { class: 'knopf', onclick: async () => {
+        knopf.disabled = true; knopf.textContent = 'Wird erstellt …';
+        try { kurzZeigen(await LA.kurzlinkErstellen(auswahl)); }
+        catch (e) { LA.meldung(e.message, 'fehler'); knopf.disabled = false; knopf.textContent = 'Kurzlink mit QR-Code erstellen'; }
+      } }, 'Kurzlink mit QR-Code erstellen');
+      LA.setzen(kurz, knopf, h('p', { class: 'hinweis' }, 'Dafür wird das Paket in der Datenbank der Lernwerkstatt gespeichert. Wer den Link kennt, kann es öffnen. Nur für Unterrichtsmaterial ohne Namen oder Persönliches.'));
+    };
+
+    /* Langer Link (ohne Datenbank) */
+    const feld = h('textarea', { rows: 3, readonly: true });
     const warnung = h('div');
     let link = '';
-    const bauen = async (inhalt) => {
-      link = basis + '#paket=' + await LA.paketZuLink(inhalt);
+    const langBauen = async () => {
+      link = basis + '#paket=' + await LA.paketZuLink(auswahl);
       feld.value = link;
-      LA.setzen(warnung, link.length > 30000 ? h('p', { class: 'rueckmeldung nein' }, `Der Link ist sehr lang (${Math.round(link.length / 1000)}k Zeichen). Manche Programme kürzen ihn. Sicherer: Export-Datei weitergeben.`) : null);
+      LA.setzen(warnung, link.length > 30000 ? h('p', { class: 'rueckmeldung nein' }, `Der Link ist sehr lang (${Math.round(link.length / 1000)}k Zeichen). Manche Programme kürzen ihn.`) : null);
     };
-    const wahl = gruppe.length > 1 ? h('select', { 'aria-label': 'Was teilen?', onchange: (e) => bauen(e.target.value === 'alle' ? gruppe : gruppe.find((x) => x.id === e.target.value)) },
+
+    const wahl = gruppe.length > 1 ? h('select', { 'aria-label': 'Was teilen?', onchange: (e) => {
+      auswahl = e.target.value === 'alle' ? gruppe : gruppe.find((x) => x.id === e.target.value);
+      kurzVorbereiten(); langBauen();
+    } },
       h('option', { value: 'alle' }, 'Alle Niveaus – die Lernenden wählen selbst'),
       gruppe.map((x) => h('option', { value: x.id }, 'Nur ' + niveauText(x) + ' (' + LA.NIVEAUS[x.niveau].lang + ')'))) : null;
-    await bauen(gruppe.length > 1 ? gruppe : p);
+
+    await langBauen();
+    kurzVorbereiten();
     dialog('Paket teilen', [
       wahl ? h('label', { class: 'ed-feld breit' }, h('span', null, 'Was teilen?'), wahl) : null,
-      h('p', null, 'Schülerinnen und Schüler öffnen diesen Link und sehen nur die Lernansicht. Das Paket steckt vollständig im Link – es wird nichts auf einen Server hochgeladen.'),
-      location.protocol === 'file:' ? h('p', { class: 'rueckmeldung nein' }, 'Achtung: Die App läuft gerade als lokale Datei. Der Link funktioniert nur, wenn die App im Internet liegt (z. B. GitHub Pages). Alternative: Export-Datei weitergeben.') : null,
-      warnung,
-      feld,
-      h('div', { class: 'reihe' }, h('button', { class: 'knopf', onclick: async () => { try { await navigator.clipboard.writeText(link); LA.meldung('Link kopiert.'); } catch { feld.select(); LA.meldung('Bitte manuell kopieren (Ctrl+C).'); } } }, 'Link kopieren')),
+      h('p', null, 'Die Lernenden öffnen den Link oder scannen den QR-Code und sehen nur die Lernansicht.'),
+      kurz,
+      h('details', { class: 'lang-link' }, h('summary', null, 'Langer Link ohne Datenbank'),
+        h('p', { class: 'hinweis' }, 'Das ganze Paket steckt im Link selbst, es wird nichts gespeichert. Spätere Änderungen kommen nicht an.'),
+        location.protocol === 'file:' ? h('p', { class: 'rueckmeldung nein' }, 'Die App läuft als lokale Datei: Der Link funktioniert nur, wenn die App im Internet liegt. Alternative: Export-Datei.') : null,
+        warnung, feld,
+        h('div', { class: 'reihe' }, h('button', { class: 'knopf sekundaer', onclick: async () => { try { await navigator.clipboard.writeText(link); LA.meldung('Link kopiert.'); } catch { feld.select(); LA.meldung('Bitte manuell kopieren (Ctrl+C).'); } } }, 'Langen Link kopieren'))),
       h('p', { class: 'hinweis' }, LA.serverStatus && LA.serverStatus.serverKi
-        ? 'Die App läuft über den Lernwerkstatt-Server: Lernende bekommen KI-Rückmeldungen' + (LA.serverStatus.codeNoetig ? ', sobald sie den Klassencode eingeben.' : ' ohne eigenen Schlüssel.')
-        : 'Denkfragen und Textkorrektur mit KI-Rückmeldung funktionieren auf Schülergeräten nur mit dem Lernwerkstatt-Server oder einem dort hinterlegten Schlüssel. Sonst gibt es Musterantworten zur Selbsteinschätzung.'),
+        ? 'KI-Rückmeldungen bekommen die Lernenden' + (LA.serverStatus.codeNoetig ? ', sobald sie den Klassencode eingeben (oben rechts 🔑).' : ' ohne eigenen Schlüssel.')
+        : 'Denkfragen und Textkorrektur mit KI-Rückmeldung funktionieren auf Schülergeräten nur mit dem Lernwerkstatt-Server. Sonst gibt es Musterantworten zur Selbsteinschätzung.'),
     ]);
   }
 
@@ -336,6 +382,7 @@
         Object.assign(neu, { id: p.id, gruppe: p.gruppe, niveau: p.niveau });
         const r = LA.lernstandUmschreiben(p.id, zuordnung);
         paketSpeichern(neu);
+        LA.kurzlinksNachSpeichern(neu, gruppeVon(neu)).then((n) => { if (n) LA.meldung(n === 1 ? 'Kurzlink aktualisiert: Die Lernenden sehen die Änderungen.' : `${n} Kurzlinks aktualisiert.`); });
         LA.meldung('Gespeichert.' + (r.vorher > r.nachher ? ` ${r.vorher - r.nachher} Karte${r.vorher - r.nachher === 1 ? '' : 'n'} aus der Lernkartei entfernt (gelöscht oder neu erzeugt).` : ''));
         paketAnsicht(neu);
       },
@@ -407,6 +454,22 @@
   async function init() {
     await LA.serverPruefen();
     if (location.hash === '#auswertung') return auswertungAnsicht();
+    const kurzcode = location.hash.match(/^#p=([A-Za-z2-9]{7})$/);
+    if (kurzcode) {
+      LA.setzen(main(), h('p', { class: 'hinweis' }, 'Lernpaket wird geladen …'));
+      try {
+        const daten = await LA.kurzlinkLaden(kurzcode[1]);
+        zustand.schuelerModus = true;
+        if (Array.isArray(daten)) { zustand.gruppe = daten.map((x) => LA.paketPruefen(x)); paketAnsicht(bevorzugtesNiveau(zustand.gruppe)); }
+        else paketAnsicht(LA.paketPruefen(daten));
+        return;
+      } catch (e) {
+        LA.meldung(e.message, 'fehler');
+        startAnsicht();
+        LA.setzen(main(), h('div', { class: 'kasten' }, h('p', null, e.message)), ...main().children);
+        return;
+      }
+    }
     const m = location.hash.match(/^#paket=(.+)$/);
     if (m) {
       try {

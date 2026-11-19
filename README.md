@@ -102,8 +102,17 @@ Eine Bewertung oder Textkorrektur kostet einen Bruchteil davon. Die echten Koste
 
 ## An die Klasse weitergeben
 
-- **Teilen**: erzeugt einen Link, in dem das ganze Paket steckt (Schüleransicht ohne Bearbeiten). Funktioniert nur, wenn die App über eine Webadresse läuft (Docker-Container, siehe unten, oder GitHub Pages), nicht als lokale Datei.
-- **Export**: JSON-Datei; Lernende öffnen sie mit «Paket importieren».
+**Kurzlink mit QR-Code (empfohlen):** In der Paketübersicht «Teilen» → «Kurzlink mit QR-Code erstellen». Du bekommst einen kurzen Link wie `…/#p=k7m2xq9` und einen QR-Code. «QR gross für Beamer» zeigt ihn bildschirmfüllend, die Klasse scannt ihn mit dem Handy oder Tablet.
+
+- Bei Paketen mit Niveaus: «Alle Niveaus» (die Lernenden wählen selbst) oder je Niveau ein eigener Kurzlink.
+- **Korrekturen kommen an:** Speicherst du das Paket später im Editor, wird der Inhalt hinter dem Kurzlink automatisch ersetzt. Das klappt nur aus dem Browser, in dem du den Kurzlink erstellt hast (dort liegt der Bearbeitungsschlüssel).
+- Die Lernenden sollten den Link als Lesezeichen speichern. Lernkartei und Flow-Stufe bleiben auf ihrem Gerät erhalten.
+- Gespeichert wird das Paket in Supabase (Tabelle `lw_pakete`, gleiches Projekt wie die Auswertung). Abrufen kann es nur, wer den Code kennt. Eine Liste aller Pakete gibt es nicht. Der Bearbeitungsschlüssel liegt dort nur als Prüfsumme. **Nur für Unterrichtsmaterial ohne Namen oder Persönliches.**
+- Ohne Internet öffnet ein bereits einmal geladener Kurzlink die zuletzt gespeicherte Fassung.
+
+**Langer Link (ohne Datenbank):** im selben Dialog unter «Langer Link ohne Datenbank». Das ganze Paket steckt im Link, nichts wird gespeichert, spätere Änderungen kommen nicht an. Lange Links können von manchen Programmen abgeschnitten werden.
+
+**Export:** JSON-Datei, die Lernenden öffnen sie mit «Paket importieren».
 
 ## Wichtige Einschränkungen
 
@@ -219,6 +228,7 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt. `js/anthropic-sdk-1.5.0.min.js` i
 - `js/editor.js` – Bearbeiten ohne JSON, Elemente mit KI neu erzeugen
 - `js/flow.js` – Flow-Training (adaptives Modell)
 - `js/statistik.js` – anonyme Zählung und Auswertung für Lehrpersonen
+- `js/kurzlink.js`, `js/vendor/qrcode.js` – Kurzlinks und QR-Code (QR Code Generator von Kazuhiko Arase, MIT-Lizenz)
 - `js/app.js` – Ansichten, Speicher, Teilen
 - `server/server.js` – Auslieferung und KI-Weiterleitung mit Schlüssel (ohne Abhängigkeiten)
 - `Dockerfile`, `docker-compose.yml`, `env.beispiel`

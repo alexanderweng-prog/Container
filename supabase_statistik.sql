@@ -34,3 +34,63 @@ revoke all on function public.lw_statistik_melden(text, text, text, text, text, 
 grant execute on function public.lw_statistik_melden(text, text, text, text, text, boolean, boolean) to anon, authenticated;
 grant select on public.lw_statistik to anon, authenticated;
 revoke insert, update, delete on public.lw_statistik from anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Kurzlinks: geteilte Pakete unter 7-stelligem Code (nur über die Funktionen zugänglich)
+create table if not exists public.lw_pakete (
+  code text primary key check (code ~ '^[a-z2-9]{7}$'),
+  titel text not null default '' check (length(titel) <= 200),
+  daten jsonb not null,
+  token_hash text not null,
+  erstellt timestamptz not null default now(),
+  aktualisiert timestamptz not null default now(),
+  abrufe integer not null default 0
+);
+alter table public.lw_pakete enable row level security;
+revoke all on public.lw_pakete from anon, authenticated;
+
+create or replace function public.lw_paket_teilen(p_daten jsonb, p_titel text, p_token text)
+returns text language plpgsql security definer set search_path = '' as $$
+declare alphabet constant text := 'abcdefghjkmnpqrstuvwxyz23456789'; v_code text; v_bytes bytea; i int;
+begin
+  if p_daten is null or jsonb_typeof(p_daten) not in ('object', 'array') then raise exception 'ungültiges Paket'; end if;
+  if octet_length(p_daten::text) > 1500000 then raise exception 'Paket zu gross'; end if;
+  if p_token is null or length(p_token) not between 24 and 100 then raise exception 'ungültiger Schlüssel'; end if;
+  for versuch in 1..10 loop
+    v_bytes := extensions.gen_random_bytes(7); v_code := '';
+    for i in 0..6 loop v_code := v_code || substr(alphabet, (get_byte(v_bytes, i) % length(alphabet)) + 1, 1); end loop;
+    begin
+      insert into public.lw_pakete (code, titel, daten, token_hash)
+      values (v_code, left(coalesce(p_titel, ''), 200), p_daten, encode(extensions.digest(p_token, 'sha256'), 'hex'));
+      return v_code;
+    exception when unique_violation then end;
+  end loop;
+  raise exception 'Kein freier Code gefunden';
+end; $$;
+
+create or replace function public.lw_paket_aktualisieren(p_code text, p_daten jsonb, p_titel text, p_token text)
+returns boolean language plpgsql security definer set search_path = '' as $$
+declare v_anzahl int;
+begin
+  if p_daten is null or jsonb_typeof(p_daten) not in ('object', 'array') then raise exception 'ungültiges Paket'; end if;
+  if octet_length(p_daten::text) > 1500000 then raise exception 'Paket zu gross'; end if;
+  update public.lw_pakete set daten = p_daten, titel = left(coalesce(p_titel, ''), 200), aktualisiert = now()
+   where code = p_code and token_hash = encode(extensions.digest(coalesce(p_token, ''), 'sha256'), 'hex');
+  get diagnostics v_anzahl = row_count;
+  return v_anzahl = 1;
+end; $$;
+
+create or replace function public.lw_paket_laden(p_code text)
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare v_daten jsonb;
+begin
+  update public.lw_pakete set abrufe = abrufe + 1 where code = lower(p_code) returning daten into v_daten;
+  return v_daten;
+end; $$;
+
+revoke all on function public.lw_paket_teilen(jsonb, text, text) from public;
+revoke all on function public.lw_paket_aktualisieren(text, jsonb, text, text) from public;
+revoke all on function public.lw_paket_laden(text) from public;
+grant execute on function public.lw_paket_teilen(jsonb, text, text) to anon, authenticated;
+grant execute on function public.lw_paket_aktualisieren(text, jsonb, text, text) to anon, authenticated;
+grant execute on function public.lw_paket_laden(text) to anon, authenticated;
