@@ -33,8 +33,9 @@
   const schreiben = (id, s) => LA.speicher.schreiben(schluessel(id), s);
 
   // Jedes Spiel meldet hier jede einzelne Antwort
-  LA.melden = function (paketId, karteId, richtig) {
+  LA.melden = function (paketId, karteId, richtig, optionen = {}) {
     if (!paketId || !karteId) return;
+    if (LA.statistikMelden) LA.statistikMelden(paketId, karteId, richtig, !!optionen.wiederholung);
     const s = lesen(paketId);
     const e = s[karteId] || { fach: 0, faellig: heute(), richtig: 0, falsch: 0 };
     if (richtig) {
@@ -102,7 +103,7 @@
       const weiter = h('button', { class: 'knopf', disabled: true, onclick: naechste }, 'Weiter');
       const antwort = (ok) => {
         versuche++;
-        LA.melden(p.id, id, ok);
+        LA.melden(p.id, id, ok, { wiederholung: true });
         if (ok && !schonFalsch.has(id)) geloest++;
         // Falsch: in dieser Runde nochmals, aber nicht sofort hintereinander
         if (!ok && !schonFalsch.has(id)) { schonFalsch.add(id); warteschlange.splice(Math.min(3, warteschlange.length), 0, id); }

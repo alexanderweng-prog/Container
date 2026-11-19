@@ -110,7 +110,7 @@ Eine Bewertung oder Textkorrektur kostet einen Bruchteil davon. Die echten Koste
 - **API-Schlüssel ohne Server**: Wenn du die App als Datei öffnest, liegt der Schlüssel im Browser (localStorage) und lässt sich dort auslesen. Trag ihn deshalb nur auf dem eigenen Gerät ein. Für die Klasse ist der Docker-Container gedacht (siehe oben). Ohne KI funktionieren alle Spiele; Denkfragen zeigen dann eine Musterantwort zur Selbsteinschätzung, die Textkorrektur ist deaktiviert.
 - **Klassencode** ist ein einfacher Schutz gegen Fremdnutzung, keine echte Anmeldung. Wer ihn kennt, kann die KI nutzen, bis das Stundenlimit erreicht ist. Bei Missbrauch: Code ändern und den Container neu starten.
 - **Datenschutz**: Mit KI werden Material und Schülertexte an Anthropic (USA) gesendet. Keine Namen oder anderen Personendaten eingeben und die Vorgaben deiner Schule bzw. des Kantons prüfen.
-- **Speicher**: Pakete und Fortschritt liegen nur im jeweiligen Browser. Browserdaten löschen = weg. Wichtige Pakete exportieren.
+- **Speicher**: Pakete und Fortschritt liegen nur im jeweiligen Browser (die Auswertung zählt zusätzlich anonym, siehe oben). Browserdaten löschen = weg. Wichtige Pakete exportieren.
 - **Word-Dateien** (.docx) werden nicht gelesen → als PDF speichern.
 - Die KI kann Fehler machen. Pakete vor dem Einsatz durchsehen.
 
@@ -136,6 +136,19 @@ Läuft auf allem, was Docker kann: eigener PC, NAS (Synology, QNAP), Raspberry P
 Was der Server erzwingt: nur `/v1/messages`, nur freigegebene Modelle, höchstens 32 000 Ausgabe-Tokens pro Anfrage, Klassencode und Stundenlimit. Der Server-Code selbst wird nicht ausgeliefert.
 
 Ohne Docker geht es auch mit Node.js ab Version 20: `ANTHROPIC_API_KEY=… KLASSEN_CODE=… node server/server.js`.
+
+## Auswertung für Lehrpersonen (anonym)
+
+Unter **📊 Auswertung** auf der Startseite (oder direkt `…/#auswertung`) steht pro Paket eine Tabelle: jede Frage mit der Anzahl **richtig**, **falsch**, dem **Anteil falsch** und wie oft sie in der **Wiederholung** (Lernkartei) dran war. Die schwierigsten Fragen stehen oben. Filter nach Paket, Suche, Mindestanzahl Antworten und Export als CSV (Excel). In der Paketübersicht zeigt «Auswertung» nur dieses Paket (mit allen Niveaus).
+
+- **Anonym:** Gezählt werden nur Summen pro Frage. Es werden keine Namen, keine Geräte-Kennung und keine Zeitpunkte pro Person gespeichert. Supabase protokolliert wie jeder Webdienst technische Zugriffe (z. B. IP-Adressen) in seinen Server-Logs. Die App selbst speichert sie nicht.
+- **Öffentlich:** Jede Person mit der Adresse kann die Auswertung ansehen.
+- **Speicher:** Supabase-Projekt «Leistungs App», Tabelle `lw_statistik` (getrennt von den Naturalia-Tabellen). Lesen ist für alle erlaubt, Schreiben nur über die Datenbank-Funktion `lw_statistik_melden`, die ausschliesslich hochzählt.
+- **Was zählt:** Lernpfad, Multiple Choice, Wahr/Falsch, Lückentext, Kreuzworträtsel, Zuordnen, Wiederholen und Flow-Training. Nicht gezählt werden die Demo, Memory, Reihenfolge, Denkfragen und Schreibaufträge.
+- **Eigene Tests:** In den Einstellungen lässt sich das Zählen pro Gerät ausschalten. Auf `localhost` ist es standardmässig aus.
+- **Bearbeitete Fragen:** Die Statistik erkennt eine Frage an ihrem Text. Verschieben ändert nichts, eine umformulierte Frage beginnt mit einer neuen Zeile.
+- **Grenze:** Da das Melden ohne Anmeldung funktionieren muss, könnte jemand mit Absicht falsche Zähler einschicken. Für eine Übersicht im Unterricht reicht das, für Noten ist die Auswertung nicht gedacht.
+- **Abschalten:** in `js/statistik.js` bei `LA.STATISTIK` die Werte leeren. **Zurücksetzen** (z. B. zum Schuljahresbeginn): in Supabase im SQL Editor `delete from public.lw_statistik;`
 
 ## Online mit Vercel (ohne eigenen Server, Schlüssel bleibt geheim)
 
@@ -205,6 +218,7 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt. `js/anthropic-sdk-1.5.0.min.js` i
 - `js/wiederholen.js` – Lernkartei, Wiederholungsrunde, Fehlerheft
 - `js/editor.js` – Bearbeiten ohne JSON, Elemente mit KI neu erzeugen
 - `js/flow.js` – Flow-Training (adaptives Modell)
+- `js/statistik.js` – anonyme Zählung und Auswertung für Lehrpersonen
 - `js/app.js` – Ansichten, Speicher, Teilen
 - `server/server.js` – Auslieferung und KI-Weiterleitung mit Schlüssel (ohne Abhängigkeiten)
 - `Dockerfile`, `docker-compose.yml`, `env.beispiel`

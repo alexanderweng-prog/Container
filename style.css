@@ -341,3 +341,21 @@ input.luecke { width: auto; display: inline-block; min-width: 4ch; padding: 2px 
 .flow-herausforderung { background: var(--warn-soft); color: inherit; }
 .niveau-tab.empfohlen:not(.aktiv) { border-color: var(--accent); border-style: dashed; }
 .niveau-tab.empfohlen::after { content: " ★"; }
+
+/* Auswertung */
+.aw-filter { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.aw-filter select, .aw-filter input { width: auto; flex: 1 1 180px; }
+.aw-paket { display: flex; flex-direction: column; gap: 8px; }
+.aw-paket h2 { margin: 0; }
+.aw-tabelle-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.aw-tabelle { width: 100%; border-collapse: collapse; font-size: 15px; }
+.aw-tabelle th, .aw-tabelle td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.aw-tabelle th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--surface-2); white-space: nowrap; }
+.aw-tabelle tr:last-child td { border-bottom: 0; }
+.aw-tabelle .zahl { text-align: right; font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.aw-tabelle td:first-child { min-width: 240px; }
+.aw-balken { position: relative; min-width: 110px; height: 22px; background: var(--surface-2); border-radius: 6px; overflow: hidden; }
+.aw-fuellung { position: absolute; inset: 0 auto 0 0; background: var(--ok); opacity: .55; }
+.aw-fuellung.mittel { background: #c8952c; }
+.aw-fuellung.hoch { background: var(--no); }
+.aw-balken span { position: relative; display: block; padding: 0 8px; line-height: 22px; font-size: 13px; font-family: var(--f-mono); font-weight: 700; }

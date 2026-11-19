@@ -188,3 +188,22 @@ test('Editor: Lernkartei folgt verschobenen, gelöschten und neu erzeugten Eleme
   assert.equal(z('kap:2'), 'kap:2', 'unverändert bleibt gleich');
   assert.equal(z('lt:0:3'), null, 'geänderter Lückentext: Lücken-Nummern ungültig');
 });
+
+test('Statistik: Fingerabdruck und gemeldete Daten (ohne Personendaten)', () => {
+  const LA = laden('util.js', 'ki.js', 'offline.js', 'wiederholen.js', 'statistik.js');
+  assert.equal(LA.fingerabdruck('Was ist Energie?'), LA.fingerabdruck('was ist energie'), 'Gross/klein und Satzzeichen am Ende egal');
+  assert.notEqual(LA.fingerabdruck('Frage A'), LA.fingerabdruck('Frage B'));
+  assert.match(LA.fingerabdruck('x'), /^[0-9a-f]{8}$/);
+  const p = Object.assign(LA.paketPruefen(structuredClone(LA.DEMO)), { id: 'p1', niveau: 3, quelle: 'ki' });
+  const m = LA.statistikMeldung(p, 'mc:0', false, true);
+  assert.deepEqual(Object.keys(m).sort(), ['p_art', 'p_frage', 'p_karte', 'p_paket', 'p_richtig', 'p_titel', 'p_wiederholung']);
+  assert.equal(m.p_titel, 'Der Wasserkreislauf · Niveau 3');
+  assert.equal(m.p_frage, p.multiple_choice[0].frage);
+  assert.match(m.p_karte, /^mc:[0-9a-f]{8}$/);
+  assert.equal(m.p_richtig, false);
+  assert.equal(m.p_wiederholung, true);
+  // Verschobene Frage: gleiche Statistik-Zeile
+  const q = structuredClone(p); q.multiple_choice.reverse();
+  assert.equal(LA.statistikMeldung(q, `mc:${q.multiple_choice.length - 1}`, true, false).p_karte, m.p_karte);
+  assert.equal(LA.statistikMeldung(p, 'mc:999', true, false), null);
+});

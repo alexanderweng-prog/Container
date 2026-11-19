@@ -75,7 +75,8 @@
         h('div', { class: 'reihe' },
           h('button', { class: 'knopf', onclick: erstellenAnsicht }, '+ Neues Lernpaket'),
           h('button', { class: 'knopf sekundaer', onclick: () => paketAnsicht(LA.paketPruefen(structuredClone(LA.DEMO))) }, 'Demo ansehen (Wasserkreislauf)'),
-          h('button', { class: 'knopf sekundaer', onclick: () => dateiInput.click() }, 'Paket importieren'), dateiInput)),
+          h('button', { class: 'knopf sekundaer', onclick: () => dateiInput.click() }, 'Paket importieren'), dateiInput,
+          h('button', { class: 'knopf sekundaer', onclick: () => auswertungAnsicht() }, '📊 Auswertung'))),
       h('section', null,
         h('h2', null, 'Meine Lernpakete'),
         liste.length ? h('div', { class: 'karten' }, liste.filter((p, i) => !p.gruppe || liste.findIndex((x) => x.gruppe === p.gruppe) === i).map((p0) => {
@@ -199,6 +200,7 @@
     zustand.paket = p; kopf();
     niveauMerken(p);
     const gruppe = gruppeVon(p);
+    gruppe.forEach(LA.statistikPaket); // Antworten dieser Pakete dürfen anonym gezählt werden
     const empfohlen = LA.flowEmpfehlung(gruppe);
     const f = fortschritt(p.id);
     const verfuegbar = p.spiele.filter((s) => LA.SPIELE[s] && LA.SPIELE[s].moeglich(p));
@@ -243,7 +245,8 @@
           h('button', { class: 'knopf sekundaer klein', onclick: () => gruppe.length > 1
             ? LA.download(dateiname(p).replace('.json', '-niveaus.json'), JSON.stringify(gruppe, null, 2))
             : LA.download(dateiname(p), JSON.stringify(p, null, 2)) }, 'Export'),
-          h('button', { class: 'knopf sekundaer klein', onclick: () => bearbeitenAnsicht(p) }, 'Bearbeiten'))),
+          h('button', { class: 'knopf sekundaer klein', onclick: () => bearbeitenAnsicht(p) }, 'Bearbeiten'),
+          h('button', { class: 'knopf sekundaer klein', onclick: () => auswertungAnsicht(gruppe.map((x) => x.id), () => paketAnsicht(p)) }, 'Auswertung'))),
       // Fällige Wiederholungen zuerst: Abrufen vor Neuem
       ls.faellig.length ? wiederholenBereich : null,
       lernpfad ? h('section', null, h('div', { class: 'label' }, '1 · Zuerst lernen'), spielKarte('lernpfad', true)) : null,
@@ -347,6 +350,16 @@
     window.scrollTo({ top: 0 });
   }
 
+  /* ---------- Auswertung (öffentlich, anonym) ---------- */
+  function auswertungAnsicht(nurPakete, zurueck) {
+    LA.vorlesenStoppen();
+    zustand.paket = null; zustand.schuelerModus = false; kopf();
+    // Gesamtauswertung bekommt eine eigene Adresse, die man weitergeben kann
+    try { history.replaceState(null, '', nurPakete ? location.pathname + location.search : '#auswertung'); } catch { /* egal */ }
+    LA.auswertung(main(), { nurPakete, zurueck: zurueck || (() => { try { history.replaceState(null, '', location.pathname + location.search); } catch { /* egal */ } startAnsicht(); }) });
+    window.scrollTo({ top: 0 });
+  }
+
   /* ---------- Spiel ---------- */
   function spielAnsicht(s) {
     LA.vorlesenStoppen();
@@ -382,6 +395,8 @@
         h('label', null, st && st.serverKi ? 'Eigener Claude-API-Schlüssel (optional)' : 'Claude-API-Schlüssel', key),
         h('p', { class: 'hinweis' }, 'Den Schlüssel bekommst du auf console.anthropic.com (Konto, Guthaben laden, «API Keys»). Er wird nur in diesem Browser gespeichert und direkt an Anthropic gesendet. Wer Zugriff auf diesen Browser hat, kann ihn auslesen – darum nur auf dem eigenen Gerät eintragen, nicht auf Schülergeräten.'),
         h('label', null, 'Modell', modell),
+        h('label', { class: 'schalter' }, h('input', { type: 'checkbox', id: 'statistik', checked: LA.statistikAktiv(), onchange: (ev) => { LA.statistikEinstellen(ev.target.checked); LA.meldung(ev.target.checked ? 'Antworten von diesem Gerät werden anonym gezählt.' : 'Dieses Gerät zählt nicht mehr mit.'); } }),
+          ' Antworten von diesem Gerät anonym für die Auswertung zählen (ausschalten, damit eigene Tests nicht mitzählen)'),
         h('p', { class: 'hinweis' }, 'Preise sind grobe Schätzungen für ein mittelgrosses Material. Bewertungen und Korrekturen kosten pro Aufruf deutlich weniger.'),
         h('div', { class: 'reihe' },
           h('button', { class: 'knopf', onclick: () => { LA.einstellungenSpeichern({ apiKey: key.value.trim(), modell: modell.value, klassenCode: code.value.trim() }); LA.meldung('Gespeichert.'); startAnsicht(); } }, 'Speichern'),
@@ -391,6 +406,7 @@
   /* ---------- Start ---------- */
   async function init() {
     await LA.serverPruefen();
+    if (location.hash === '#auswertung') return auswertungAnsicht();
     const m = location.hash.match(/^#paket=(.+)$/);
     if (m) {
       try {
