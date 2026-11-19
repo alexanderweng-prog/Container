@@ -1,0 +1,15 @@
+# Start:  docker compose up -d   →  http://localhost:8080
+# Schlüssel und Klassencode gehören in eine Datei ".env" neben dieser Datei (siehe env.beispiel).
+services:
+  lernwerkstatt:
+    build: .
+    image: lernwerkstatt:latest
+    container_name: lernwerkstatt
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      KLASSEN_CODE: ${KLASSEN_CODE:-}
+      LIMIT_PRO_STUNDE: ${LIMIT_PRO_STUNDE:-60}
+      MODELLE: ${MODELLE:-claude-opus-5-5,claude-sonnet-5-5,claude-haiku-5-5}
