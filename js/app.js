@@ -4,7 +4,23 @@
   const PAKETE_KEY = 'lernapp.pakete';
   const main = () => document.getElementById('inhalt');
 
-  const zustand = { paket: null, schuelerModus: false };
+  const zustand = { paket: null, schuelerModus: false, gruppe: null };
+
+  /* ---------- Niveaus: Pakete derselben Gruppe ---------- */
+  function gruppeVon(p) {
+    if (!p || !p.gruppe) return p ? [p] : [];
+    // Schüleransicht: nur, was im Link steckt (auch wenn im selben Browser die ganze Gruppe gespeichert ist)
+    if (zustand.schuelerModus) return zustand.gruppe && zustand.gruppe.some((x) => x.id === p.id) ? [...zustand.gruppe].sort((a, b) => (a.niveau || 2) - (b.niveau || 2)) : [p];
+    const liste = pakete().filter((x) => x.gruppe === p.gruppe);
+    return (liste.some((x) => x.id === p.id) ? liste : [p, ...liste]).sort((a, b) => (a.niveau || 2) - (b.niveau || 2));
+  }
+  const niveauMerken = (p) => { if (p.gruppe) LA.speicher.schreiben('lernapp.niveau.' + p.gruppe, p.niveau); };
+  function bevorzugtesNiveau(liste) {
+    const gemerkt = liste[0] && liste[0].gruppe ? LA.speicher.lesen('lernapp.niveau.' + liste[0].gruppe, 2) : 2;
+    return liste.find((x) => x.niveau === gemerkt) || liste.find((x) => x.niveau === 2) || liste[0];
+  }
+  const niveauText = (p) => (p.niveau && LA.NIVEAUS[p.niveau] ? `${LA.NIVEAUS[p.niveau].name} ${LA.NIVEAUS[p.niveau].zeichen}` : '');
+  LA.niveauText = niveauText;
 
   /* ---------- Bibliothek ---------- */
   const pakete = () => LA.speicher.lesen(PAKETE_KEY, []);
@@ -41,12 +57,15 @@
 
   /* ---------- Start: Paketliste ---------- */
   function startAnsicht() {
-    zustand.paket = null; zustand.schuelerModus = false; kopf();
+    zustand.paket = null; zustand.schuelerModus = false; zustand.gruppe = null; kopf();
     const liste = pakete();
     const dateiInput = h('input', { type: 'file', accept: '.json,application/json', hidden: true, onchange: async (e) => {
       try {
-        const p = LA.paketPruefen(JSON.parse(await e.target.files[0].text()));
-        paketSpeichern(p); LA.meldung('Paket importiert.'); paketAnsicht(p);
+        const daten = JSON.parse(await e.target.files[0].text());
+        const liste = (Array.isArray(daten) ? daten : [daten]).map((x) => LA.paketPruefen(x));
+        liste.forEach(paketSpeichern);
+        LA.meldung(liste.length > 1 ? `${liste.length} Niveaus importiert.` : 'Paket importiert.');
+        paketAnsicht(bevorzugtesNiveau(liste));
       } catch { LA.meldung('Diese Datei ist kein gültiges Lernpaket.', 'fehler'); }
     } });
     LA.setzen(main(), 
@@ -59,16 +78,20 @@
           h('button', { class: 'knopf sekundaer', onclick: () => dateiInput.click() }, 'Paket importieren'), dateiInput)),
       h('section', null,
         h('h2', null, 'Meine Lernpakete'),
-        liste.length ? h('div', { class: 'karten' }, liste.map((p) => {
+        liste.length ? h('div', { class: 'karten' }, liste.filter((p, i) => !p.gruppe || liste.findIndex((x) => x.gruppe === p.gruppe) === i).map((p0) => {
+          const gruppe = gruppeVon(p0);
+          const p = bevorzugtesNiveau(gruppe);
           const f = fortschritt(p.id);
           const erledigt = Object.keys(f).length;
-          const faellig = LA.lernstand(p).faellig.length;
+          const faellig = gruppe.reduce((n, x) => n + LA.lernstand(x).faellig.length, 0);
           return h('button', { class: 'karte', onclick: () => paketAnsicht(p) },
             h('div', { class: 'label' }, [p.fach, p.stufe].filter(Boolean).join(' · ') || 'Lernpaket'),
             h('div', { class: 'karte-titel' }, p.titel),
             h('div', { class: 'hinweis' }, p.kurzbeschreibung),
             h('div', { class: 'hinweis' }, `${p.spiele.length} Spiele · ${erledigt} gespielt${p.quelle === 'offline' ? ' · ohne KI' : ''}`),
-            faellig ? h('span', { class: 'tag faellig-tag' }, `🔁 ${faellig} fällig`) : null);
+            h('div', { class: 'reihe' },
+              gruppe.length > 1 ? h('span', { class: 'tag' }, `${gruppe.length} Niveaus`) : null,
+              faellig ? h('span', { class: 'tag faellig-tag' }, `🔁 ${faellig} fällig`) : null));
         })) : h('p', { class: 'hinweis' }, 'Noch keine Pakete. Erstelle eines oder schau dir die Demo an.')));
   }
 
@@ -117,6 +140,7 @@
     const stufe = stufenAuswahl('stufe');
     const hinweis = h('input', { id: 'wunsch', type: 'text', placeholder: 'optional, z. B. «Fokus auf Fachbegriffe», «eher leicht», «mit Reihenfolge-Aufgabe»' });
     const status = h('div', { class: 'status', 'aria-live': 'polite' });
+    const dreiNiveaus = h('input', { type: 'checkbox', id: 'dreiniveaus' });
     const knopf = h('button', { class: 'knopf', onclick: async () => {
       if (!material.value.trim() && !dateien.length) { status.textContent = 'Bitte Text einfügen oder eine Datei wählen.'; return; }
       knopf.disabled = true;
@@ -128,7 +152,8 @@
           beiFortschritt: (n) => { const s = status.querySelector('.hinweis'); if (s) s.textContent = ` (${n.toLocaleString('de-CH')} Zeichen empfangen)`; } });
         paketSpeichern(p);
         LA.meldung('Lernpaket erstellt.');
-        paketAnsicht(p);
+        if (dreiNiveaus.checked) { clearInterval(tick); await niveausErzeugen(p, status); }
+        else paketAnsicht(p);
       } catch (e) {
         LA.setzen(status, h('div', { class: 'rueckmeldung nein' }, e.message));
       } finally { clearInterval(tick); knopf.disabled = false; }
@@ -139,6 +164,7 @@
       h('label', null, 'Material (Text)', material),
       h('label', null, 'oder/und Dateien: PDF, Fotos von Arbeitsblättern, Textdateien', dateiInput), dateiListe,
       h('label', null, 'Wunsch an die KI', hinweis),
+      h('label', { class: 'schalter' }, dreiNiveaus, ' Gleich in drei Niveaus erstellen (●, ●●, ●●●) – dauert länger und kostet etwa dreimal so viel'),
       h('div', { class: 'reihe' }, knopf, h('span', { class: 'hinweis' }, 'Modell: ' + ((LA.MODELLE.find((m) => m.id === LA.aktuellesModell()) || {}).name || '') + (LA.serverModus() ? ' · über Server' : ''))),
       status);
   }
@@ -164,6 +190,8 @@
   function paketAnsicht(p) {
     LA.vorlesenStoppen();
     zustand.paket = p; kopf();
+    niveauMerken(p);
+    const gruppe = gruppeVon(p);
     const f = fortschritt(p.id);
     const verfuegbar = p.spiele.filter((s) => LA.SPIELE[s] && LA.SPIELE[s].moeglich(p));
     const lernpfad = verfuegbar.includes('lernpfad');
@@ -193,12 +221,20 @@
         h('div', null,
           h('div', { class: 'label' }, [p.fach, p.stufe].filter(Boolean).join(' · ')),
           h('h1', null, p.titel),
-          h('p', { class: 'intro' }, p.kurzbeschreibung)),
+          h('p', { class: 'intro' }, p.kurzbeschreibung),
+          gruppe.length > 1 ? h('div', { class: 'niveaus', role: 'tablist', 'aria-label': 'Niveau wählen' }, gruppe.map((x) =>
+            h('button', { role: 'tab', class: 'niveau-tab' + (x.id === p.id ? ' aktiv' : ''), 'aria-selected': x.id === p.id, onclick: () => paketAnsicht(x) },
+              h('span', { class: 'niveau-zeichen' }, LA.NIVEAUS[x.niveau].zeichen), ' ', zustand.schuelerModus ? LA.NIVEAUS[x.niveau].name : `${LA.NIVEAUS[x.niveau].name} · ${LA.NIVEAUS[x.niveau].lang}`))) : null),
         zustand.schuelerModus ? null : h('div', { class: 'reihe' },
           !istGespeichert ? h('button', { class: 'knopf sekundaer klein', onclick: () => { paketSpeichern(p); paketAnsicht(p); LA.meldung('In «Meine Pakete» gespeichert.'); } }, 'Speichern') : null,
           h('button', { class: 'knopf sekundaer klein', onclick: () => teilen(p) }, 'Teilen'),
           h('button', { class: 'knopf sekundaer klein', onclick: () => LA.druckDialog(p) }, 'Drucken'),
-          h('button', { class: 'knopf sekundaer klein', onclick: () => LA.download(dateiname(p), JSON.stringify(p, null, 2)) }, 'Export'),
+          gruppe.length < 2 && LA.kiVerfuegbar() ? h('button', { class: 'knopf sekundaer klein', onclick: () => {
+            if (confirm('Die KI schreibt dieses Paket zusätzlich für Niveau 1 (grundlegend) und Niveau 3 (erweitert) um. Dieses Paket wird Niveau 2. Das kostet etwa doppelt so viel wie ein neues Paket. Weiter?')) niveausErzeugen(p);
+          } }, 'Niveaus erzeugen') : null,
+          h('button', { class: 'knopf sekundaer klein', onclick: () => gruppe.length > 1
+            ? LA.download(dateiname(p).replace('.json', '-niveaus.json'), JSON.stringify(gruppe, null, 2))
+            : LA.download(dateiname(p), JSON.stringify(p, null, 2)) }, 'Export'),
           h('button', { class: 'knopf sekundaer klein', onclick: () => bearbeitenAnsicht(p) }, 'Bearbeiten'))),
       // Fällige Wiederholungen zuerst: Abrufen vor Neuem
       ls.faellig.length ? wiederholenBereich : null,
@@ -210,18 +246,47 @@
   }
   LA.zurUebersicht = () => paketAnsicht(zustand.paket);
 
+  async function niveausErzeugen(p, statusZiel) {
+    const status = statusZiel || h('div', { class: 'status', 'aria-live': 'polite' });
+    if (!statusZiel) LA.setzen(main(), h('h1', null, p.titel), status);
+    p.gruppe = p.gruppe || LA.id();
+    p.niveau = 2;
+    paketSpeichern(p);
+    const zeichen = { 1: 0, 3: 0 };
+    const zeige = () => LA.setzen(status, h('span', null, 'Die KI schreibt das Paket für die anderen Niveaus um …'),
+      h('span', { class: 'hinweis' }, ` Niveau 1: ${zeichen[1].toLocaleString('de-CH')} Zeichen · Niveau 3: ${zeichen[3].toLocaleString('de-CH')} Zeichen (meist 1–2 Minuten)`),
+      h('div', { class: 'balken laeuft' }, h('div')));
+    zeige();
+    const ergebnisse = await Promise.allSettled([1, 3].map((n) => LA.niveauErzeugen({ paket: p, niveau: n, beiFortschritt: (z) => { zeichen[n] = z; zeige(); } })
+      .then((v) => { Object.assign(v, { gruppe: p.gruppe, niveau: n, titel: p.titel }); paketSpeichern(v); return v; })));
+    const fehler = ergebnisse.filter((r) => r.status === 'rejected');
+    if (fehler.length) LA.meldung(`${fehler.length} Niveau${fehler.length === 1 ? '' : 's'} konnte${fehler.length === 1 ? '' : 'n'} nicht erstellt werden: ${fehler[0].reason.message}`, 'fehler');
+    else LA.meldung('Drei Niveaus erstellt. Bitte durchsehen, bevor die Klasse sie nutzt.');
+    paketAnsicht(p);
+  }
+
   const dateiname = (p) => (p.titel || 'lernpaket').toLowerCase().replace(/[^a-z0-9äöü]+/gi, '-').replace(/^-|-$/g, '') + '.json';
 
   async function teilen(p) {
-    const code = await LA.paketZuLink(p);
+    const gruppe = gruppeVon(p);
     const basis = location.href.split('#')[0];
-    const link = basis + '#paket=' + code;
-    const zuLang = link.length > 30000;
-    const feld = h('textarea', { rows: 4, readonly: true }, link);
+    const feld = h('textarea', { rows: 4, readonly: true });
+    const warnung = h('div');
+    let link = '';
+    const bauen = async (inhalt) => {
+      link = basis + '#paket=' + await LA.paketZuLink(inhalt);
+      feld.value = link;
+      LA.setzen(warnung, link.length > 30000 ? h('p', { class: 'rueckmeldung nein' }, `Der Link ist sehr lang (${Math.round(link.length / 1000)}k Zeichen). Manche Programme kürzen ihn. Sicherer: Export-Datei weitergeben.`) : null);
+    };
+    const wahl = gruppe.length > 1 ? h('select', { 'aria-label': 'Was teilen?', onchange: (e) => bauen(e.target.value === 'alle' ? gruppe : gruppe.find((x) => x.id === e.target.value)) },
+      h('option', { value: 'alle' }, 'Alle Niveaus – die Lernenden wählen selbst'),
+      gruppe.map((x) => h('option', { value: x.id }, 'Nur ' + niveauText(x) + ' (' + LA.NIVEAUS[x.niveau].lang + ')'))) : null;
+    await bauen(gruppe.length > 1 ? gruppe : p);
     dialog('Paket teilen', [
+      wahl ? h('label', { class: 'ed-feld breit' }, h('span', null, 'Was teilen?'), wahl) : null,
       h('p', null, 'Schülerinnen und Schüler öffnen diesen Link und sehen nur die Lernansicht. Das Paket steckt vollständig im Link – es wird nichts auf einen Server hochgeladen.'),
       location.protocol === 'file:' ? h('p', { class: 'rueckmeldung nein' }, 'Achtung: Die App läuft gerade als lokale Datei. Der Link funktioniert nur, wenn die App im Internet liegt (z. B. GitHub Pages). Alternative: Export-Datei weitergeben.') : null,
-      zuLang ? h('p', { class: 'rueckmeldung nein' }, `Der Link ist sehr lang (${Math.round(link.length / 1000)}k Zeichen). Manche Programme kürzen ihn. Sicherer: Export-Datei weitergeben.`) : null,
+      warnung,
       feld,
       h('div', { class: 'reihe' }, h('button', { class: 'knopf', onclick: async () => { try { await navigator.clipboard.writeText(link); LA.meldung('Link kopiert.'); } catch { feld.select(); LA.meldung('Bitte manuell kopieren (Ctrl+C).'); } } }, 'Link kopieren')),
       h('p', { class: 'hinweis' }, LA.serverStatus && LA.serverStatus.serverKi
@@ -249,34 +314,23 @@
 
   /* ---------- Bearbeiten ---------- */
   function bearbeitenAnsicht(p) {
-    const kopie = structuredClone(p);
-    const titel = h('input', { type: 'text', value: kopie.titel });
-    const auswahl = LA.SPIELTYPEN.map((s) => {
-      const moeglich = LA.SPIELE[s].moeglich(kopie);
-      return h('label', { class: 'schalter' + (moeglich ? '' : ' gedimmt') }, h('input', { type: 'checkbox', value: s, checked: kopie.spiele.includes(s), disabled: !moeglich }), ` ${LA.SPIELE[s].symbol} ${LA.SPIELE[s].name}`, moeglich ? '' : ' (zu wenig Inhalt)');
+    LA.editor(main(), p, {
+      speichern: (neu, zuordnung) => {
+        Object.assign(neu, { id: p.id, gruppe: p.gruppe, niveau: p.niveau });
+        const r = LA.lernstandUmschreiben(p.id, zuordnung);
+        paketSpeichern(neu);
+        LA.meldung('Gespeichert.' + (r.vorher > r.nachher ? ` ${r.vorher - r.nachher} Karte${r.vorher - r.nachher === 1 ? '' : 'n'} aus der Lernkartei entfernt (gelöscht oder neu erzeugt).` : ''));
+        paketAnsicht(neu);
+      },
+      abbrechen: () => paketAnsicht(p),
+      loeschen: () => {
+        const gruppe = gruppeVon(p);
+        if (!confirm(gruppe.length > 1 ? `«${p.titel}» mit allen ${gruppe.length} Niveaus löschen?` : `«${p.titel}» wirklich löschen?`)) return;
+        gruppe.forEach((x) => paketLoeschen(x.id));
+        startAnsicht();
+      },
     });
-    const json = h('textarea', { rows: 18, class: 'mono', spellcheck: 'false' }, JSON.stringify(kopie, null, 2));
-    const status = h('div', { 'aria-live': 'polite' });
-    LA.setzen(main(), 
-      h('h1', null, 'Paket bearbeiten'),
-      h('div', { class: 'formular' },
-        h('label', null, 'Titel', titel),
-        h('fieldset', null, h('legend', null, 'Welche Spiele sollen erscheinen?'), h('div', { class: 'schalter-raster' }, auswahl)),
-        h('div', { class: 'reihe' },
-          h('button', { class: 'knopf', onclick: () => {
-            kopie.titel = titel.value.trim() || kopie.titel;
-            kopie.spiele = auswahl.map((l) => l.querySelector('input')).filter((i) => i.checked).map((i) => i.value);
-            paketSpeichern(kopie); LA.meldung('Gespeichert.'); paketAnsicht(kopie);
-          } }, 'Speichern'),
-          h('button', { class: 'knopf sekundaer', onclick: () => paketAnsicht(p) }, 'Abbrechen'),
-          h('button', { class: 'knopf gefahr', onclick: () => { if (confirm(`«${p.titel}» wirklich löschen?`)) { paketLoeschen(p.id); startAnsicht(); } } }, 'Löschen')),
-        h('details', null, h('summary', null, 'Fortgeschritten: Inhalte direkt bearbeiten (JSON)'),
-          h('p', { class: 'hinweis' }, 'Hier kannst du jede Frage, Erklärung und jeden Begriff ändern. Lücken im Lückentext stehen als {{Wort}}. Bei Multiple Choice ist «richtig» die Nummer der richtigen Option, beginnend bei 0.'),
-          json,
-          h('button', { class: 'knopf sekundaer', onclick: () => {
-            try { const neu = LA.paketPruefen(JSON.parse(json.value)); neu.id = p.id; paketSpeichern(neu); LA.meldung('Inhalte übernommen.'); paketAnsicht(neu); }
-            catch (e) { LA.setzen(status, h('div', { class: 'rueckmeldung nein' }, 'JSON-Fehler: ' + e.message)); }
-          } }, 'JSON übernehmen'), status)));
+    window.scrollTo({ top: 0 });
   }
 
   /* ---------- Spiel ---------- */
@@ -325,10 +379,11 @@
     const m = location.hash.match(/^#paket=(.+)$/);
     if (m) {
       try {
-        const p = LA.paketPruefen(await LA.linkZuPaket(m[1]));
+        const daten = await LA.linkZuPaket(m[1]);
         zustand.schuelerModus = true;
         // Fortschritt bleibt erhalten, wenn derselbe Link erneut geöffnet wird
-        paketAnsicht(p);
+        if (Array.isArray(daten)) { zustand.gruppe = daten.map((x) => LA.paketPruefen(x)); paketAnsicht(bevorzugtesNiveau(zustand.gruppe)); }
+        else paketAnsicht(LA.paketPruefen(daten));
         return;
       } catch { LA.meldung('Der Link ist beschädigt oder unvollständig.', 'fehler'); }
     }

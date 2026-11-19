@@ -17,13 +17,35 @@ Du gibst Unterrichtsmaterial hinein (Text, PDF, Foto eines Arbeitsblatts). Die K
 | Denkfragen | Begründen, Anwenden – die KI bewertet die Antwort (0–3 Punkte) |
 | Schreiben & Korrektur | Schreibauftrag – die KI markiert Fehler und erklärt die Regel |
 
-Die Spiele, die gar nicht zum Inhalt passen (z. B. Reihenfolge ohne Ablauf), erscheinen nicht. Unter «Bearbeiten» kannst du Spiele ein- und ausschalten und jede Frage im JSON ändern.
+Die Spiele, die gar nicht zum Inhalt passen (z. B. Reihenfolge ohne Ablauf), erscheinen nicht. Unter «Bearbeiten» kannst du Spiele ein- und ausschalten und jede Frage ändern (siehe unten).
 
 ## Für alle Spiele
 
 - **Vorlesen** 🔊: Erklärungen, Fragen, Aussagen und Aufträge können vorgelesen werden. Das macht der Browser selbst, gratis und ohne KI. Die Stimme hängt vom Gerät ab und ist nicht überall gut. Ein zweiter Klick stoppt.
 - **Tippfehler**: Im Lückentext zählen kleine Tippfehler («Verdunstug») als richtig, die korrekte Schreibweise wird aber angezeigt. Kurze Wörter (unter 5 Buchstaben) werden streng geprüft, weil sonst «Mehr» für «Meer» durchginge. Umlaute dürfen als ae/oe/ue geschrieben werden.
 - **Kreuzworträtsel**: Ä, Ö, Ü und ß normal tippen, sie werden automatisch auf zwei Felder verteilt (AE, OE, UE, SS).
+
+## Bearbeiten
+
+Unter **Bearbeiten** lässt sich jedes Element einzeln ändern, verschieben (▲▼), löschen oder hinzufügen: Lernschritte, Fachbegriffe, Multiple Choice, Lückentexte, Wahr/Falsch, Reihenfolgen, Denkfragen und Schreibauftrag.
+
+- **Multiple Choice:** die richtige Antwort per Klick auf den Punkt davor wählen.
+- **Lückentext:** Wort im Text markieren und «Markiertes Wort zur Lücke machen» drücken.
+- **✨ Mit KI neu erzeugen:** ersetzt ein einzelnes Element, optional mit Wunsch («einfacher», «andere Falschantworten»). **✨ Mit KI hinzufügen** erstellt ein zusätzliches Element. Neu erzeugte Elemente sind grün umrandet. Erst «Speichern» übernimmt sie.
+- **Unvollständige Einträge** (Frage ohne Text, Lückentext ohne Lücke …) werden beim Speichern nach Rückfrage entfernt.
+- **Lernkartei:** Verschobene Fragen behalten ihren Lernstand. Gelöschte und neu erzeugte Fragen beginnen neu. Wird ein Lückentext verändert, beginnen seine Lücken neu.
+- Für Fortgeschrittene gibt es weiterhin alles als JSON. Das Übernehmen setzt dort den Lernstand zurück.
+
+## Niveaus
+
+Ein Paket kann es in drei Fassungen geben: **Niveau 1 ●** (grundlegend: einfache Sprache, weniger Stoff, mehr Beispiele), **Niveau 2 ●●** (mittel) und **Niveau 3 ●●●** (erweitert: Fachsprache, Transfer- und Begründungsaufgaben). Thema und Kernbegriffe bleiben gleich, damit die Klasse gemeinsam am selben Thema arbeitet.
+
+- **Erzeugen:** beim Erstellen «Gleich in drei Niveaus erstellen» ankreuzen, oder bei einem bestehenden Paket «Niveaus erzeugen». Dieses wird dann Niveau 2, die KI schreibt es für 1 und 3 um. Das kostet etwa doppelt so viel wie ein neues Paket.
+- **Umschalten** in der Paketübersicht. In «Meine Pakete» erscheint die Gruppe als eine Karte.
+- **Teilen:** «Alle Niveaus» (die Lernenden wählen selbst, die App merkt sich die Wahl) oder gezielt ein einzelnes Niveau.
+- Jedes Niveau ist ein eigenes Paket mit eigener Lernkartei, eigenem Bearbeiten und eigenem Druck (das Niveau steht im Kopf des Arbeitsblatts).
+- In der Schüleransicht stehen nur «Niveau 1 / 2 / 3», ohne «grundlegend» oder «erweitert».
+- Die KI-Fassungen bitte durchsehen. Ob die Niveaus für deine Klasse passend abgestuft sind, kann nur der Einsatz zeigen.
 
 ## Gezielt wiederholen (Lernkartei)
 
@@ -147,6 +169,7 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt. `js/anthropic-sdk-1.5.0.min.js` i
 - `js/offline.js` – Generator ohne KI und Demo-Paket
 - `js/druck.js` – Arbeitsblatt und Lösungsblatt
 - `js/wiederholen.js` – Lernkartei, Wiederholungsrunde, Fehlerheft
+- `js/editor.js` – Bearbeiten ohne JSON, Elemente mit KI neu erzeugen
 - `js/app.js` – Ansichten, Speicher, Teilen
 - `server/server.js` – Auslieferung und KI-Weiterleitung mit Schlüssel (ohne Abhängigkeiten)
 - `Dockerfile`, `docker-compose.yml`, `env.beispiel`

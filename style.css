@@ -286,3 +286,32 @@ details summary { cursor: pointer; }
 .fehlerliste { padding-left: 22px; display: flex; flex-direction: column; gap: 10px; margin: 0; }
 .fehlerliste li { border-bottom: 1px solid var(--line); padding-bottom: 8px; }
 input.luecke { width: auto; display: inline-block; min-width: 4ch; padding: 2px 6px; border-radius: 6px 6px 0 0; }
+
+/* Editor */
+.ed-bereich { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 0; }
+.ed-bereich > summary { padding: 14px 16px; display: flex; gap: 10px; align-items: center; font-size: 17px; list-style: none; }
+.ed-bereich > summary::before { content: "▸"; color: var(--muted); }
+.ed-bereich[open] > summary::before { content: "▾"; }
+.ed-bereich > *:not(summary) { margin: 0 16px 14px; }
+.ed-element { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: var(--bg); }
+.ed-element.neu { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.ed-nr { font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.ed-feld { display: flex; flex-direction: column; gap: 4px; font-size: 14px; font-weight: 600; }
+.ed-feld > span { color: var(--muted); }
+.ed-feld textarea, .ed-feld input, .ed-feld select { font-weight: 400; }
+.ed-drei { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 10px; }
+@media (max-width: 640px) { .ed-drei { grid-template-columns: 1fr; } }
+.ed-unter { border-left: 3px solid var(--line); padding-left: 12px; display: flex; flex-direction: column; gap: 8px; }
+.ed-mc, .ed-optionen { display: flex; flex-direction: column; gap: 6px; }
+.ed-option { display: flex; gap: 8px; align-items: center; }
+.ed-option input[type=radio] { width: 20px; height: 20px; flex: none; accent-color: var(--ok); }
+.ed-option input[type=text] { flex: 1; }
+.ed-ki summary { color: var(--accent); font-size: 14px; font-weight: 600; }
+.ed-ki .reihe { margin-top: 8px; flex-wrap: nowrap; }
+.mini.gefahr { color: var(--no); }
+
+/* Niveaus */
+.niveaus { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.niveau-tab { background: var(--surface); border: 1.5px solid var(--line); border-radius: 99px; padding: 6px 14px; font-weight: 600; min-height: 40px; }
+.niveau-tab.aktiv { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.niveau-zeichen { letter-spacing: 1px; }

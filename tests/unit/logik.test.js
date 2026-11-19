@@ -112,6 +112,14 @@ test('Paketprüfung entfernt kaputte Inhalte', () => {
     lueckentexte: [{ titel: 'ohne Lücke', text: 'nichts' }], begriffe: [{ begriff: '', erklaerung: 'x' }],
   });
   assert.equal(p.multiple_choice.length, 1);
+  const q = LA.paketPruefen({ multiple_choice: [
+    { frage: 'A?', optionen: ['', 'x', '', 'y'], richtig: 3 },   // leere Optionen raus, Index wandert mit
+    { frage: '', optionen: ['a', 'b'], richtig: 0 },              // Frage ohne Text
+    { frage: 'B?', optionen: ['', 'b'], richtig: 0 },             // richtige Antwort leer
+  ], wahr_falsch: [{ aussage: '', wahr: true }, { aussage: 'ok', wahr: false }], reihenfolgen: [{ titel: 't', schritte: ['1', '', '2', '3'] }] });
+  assert.deepEqual(q.multiple_choice, [{ frage: 'A?', optionen: ['x', 'y'], richtig: 1 }]);
+  assert.equal(q.wahr_falsch.length, 1);
+  assert.deepEqual(q.reihenfolgen[0].schritte, ['1', '2', '3']);
   assert.equal(p.lueckentexte.length, 0);
   assert.equal(p.begriffe.length, 0);
   assert.deepEqual(p.spiele, ['memory']);
@@ -157,4 +165,26 @@ test('Lernkartei: Karten-IDs decken alle Abfragearten ab', () => {
   assert.deepEqual([...arten].sort(), ['begriff', 'kap', 'kat', 'lt', 'mc', 'wf']);
   const luecken = [...LA.karten(p).keys()].filter((id) => id.startsWith('lt:')).length;
   assert.equal(luecken, (p.lueckentexte[0].text.match(/\{\{/g) || []).length);
+});
+
+test('Editor: Lernkartei folgt verschobenen, gelöschten und neu erzeugten Elementen', () => {
+  const LA = laden('util.js', 'ki.js', 'offline.js', 'wiederholen.js', 'editor.js');
+  const original = LA.paketPruefen(structuredClone(LA.DEMO));
+  const kopie = structuredClone(original);
+  for (const b of LA.EDITOR_BEREICHE) kopie[b.art].forEach((el, i) => { el._alt = i; });
+  kopie.wahr_falsch.splice(0, 1);                              // erste Aussage gelöscht
+  kopie.multiple_choice.reverse();                             // Reihenfolge umgedreht
+  kopie.multiple_choice[0]._neu = true;                        // eine Frage neu erzeugt
+  kopie.begriffe.unshift({ begriff: 'Neu', erklaerung: 'x', kategorie: '' }); // vorne eingefügt
+  kopie.lueckentexte[0].text += ' Geändert.';                  // Lückentext verändert
+  const z = LA._karteiZuordnung(original, kopie);
+  const n = original.multiple_choice.length;
+  assert.equal(z('wf:0'), null, 'gelöschte Karte verschwindet');
+  assert.equal(z('wf:1'), 'wf:0', 'nachfolgende rücken auf');
+  assert.equal(z('mc:0'), `mc:${n - 1}`, 'verschobene Frage behält ihren Lernstand');
+  assert.equal(z(`mc:${n - 1}`), null, 'neu erzeugte Frage beginnt neu');
+  assert.equal(z('begriff:0'), 'begriff:1');
+  assert.equal(z('kat:0'), 'kat:1', 'Gruppen-Karten folgen ihrem Begriff');
+  assert.equal(z('kap:2'), 'kap:2', 'unverändert bleibt gleich');
+  assert.equal(z('lt:0:3'), null, 'geänderter Lückentext: Lücken-Nummern ungültig');
 });

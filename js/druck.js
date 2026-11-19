@@ -49,7 +49,7 @@
     const loesungTeil = (titel, ...inhalt) => h('section', { class: 'druck-aufgabe' }, h('h2', null, `Aufgabe ${nr}: ${titel}`), inhalt);
 
     blatt.append(h('header', { class: 'druck-kopf' },
-      h('div', null, h('div', { class: 'druck-fach' }, [p.fach, p.stufe].filter(Boolean).join(' · ')), h('h1', null, p.titel)),
+      h('div', null, h('div', { class: 'druck-fach' }, [p.fach, p.stufe, LA.niveauText ? LA.niveauText(p) : ''].filter(Boolean).join(' · ')), h('h1', null, p.titel)),
       h('div', { class: 'druck-name' }, h('div', null, 'Name: ', h('span', { class: 'feld' })), h('div', null, 'Datum: ', h('span', { class: 'feld kurz' })))));
 
     for (const t of opt.teile) {

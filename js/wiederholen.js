@@ -63,6 +63,17 @@
 
   LA.lernstandLoeschen = (id) => LA.speicher.loeschen(schluessel(id));
 
+  // Nach dem Bearbeiten: Karten-IDs auf neue Positionen umschreiben; null = Karte verwerfen
+  LA.lernstandUmschreiben = function (id, zuordnung) {
+    const alt = lesen(id), neu = {};
+    for (const [karteId, e] of Object.entries(alt)) {
+      const ziel = zuordnung(karteId);
+      if (ziel) neu[ziel] = e;
+    }
+    schreiben(id, neu);
+    return { vorher: Object.keys(alt).length, nachher: Object.keys(neu).length };
+  };
+
   /* ---------- Wiederholungsrunde ---------- */
   LA.wiederholenStarten = function (w, p, fertig, nurIds) {
     const st = LA.lernstand(p);

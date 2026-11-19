@@ -42,7 +42,7 @@ test('Bearbeiten: Spiel ausschalten und Titel ändern bleibt gespeichert', async
   await page.getByRole('button', { name: 'Bearbeiten' }).click();
   await page.locator('.formular input[type=text]').first().fill('Wasserkreislauf 7b');
   await page.locator('.schalter', { hasText: 'Memory' }).locator('input').uncheck();
-  await page.getByRole('button', { name: 'Speichern', exact: true }).click();
+  await page.getByRole('button', { name: 'Speichern', exact: true }).first().click();
   await expect(page.getByRole('heading', { level: 1, name: 'Wasserkreislauf 7b' })).toBeVisible();
   await expect(page.locator('.spiel', { hasText: 'Memory' })).toHaveCount(0);
   await page.reload();
