@@ -56,7 +56,12 @@
         for (const [j, kn] of knoepfe) if (j === frage.richtig) kn.classList.add('richtig');
         if (!richtig) k.classList.add('falsch');
         rueck.className = 'rueckmeldung ' + (richtig ? 'ok' : 'nein');
-        LA.setzen(rueck, h('strong', null, richtig ? 'Richtig. ' : 'Leider falsch. '), frage.erklaerung || '', LA.sicherheitHinweis(richtig, wert));
+        // Bei falscher Wahl: zuerst, warum genau diese Antwort nicht stimmt (Fehlvorstellung), dann die Erklärung
+        const warumNicht = !richtig && frage.rueckmeldungen && frage.rueckmeldungen[i];
+        LA.setzen(rueck, h('strong', null, richtig ? 'Richtig. ' : 'Leider falsch. '),
+          warumNicht ? h('div', { class: 'warum-nicht' }, h('span', { class: 'label' }, `Warum nicht «${frage.optionen[i]}»?`), ' ', warumNicht) : null,
+          warumNicht ? h('div', null, h('span', { class: 'label' }, 'Richtig ist'), ` «${frage.optionen[frage.richtig]}»: `, frage.erklaerung || '') : (frage.erklaerung || ''),
+          LA.sicherheitHinweis(richtig, wert));
         beiAntwort(richtig, { antwort: richtig ? '' : frage.optionen[i], sicherheit: wert });
       });
     }
@@ -463,20 +468,49 @@
         const feld = h('textarea', { rows: 5, placeholder: 'Deine Antwort …', 'aria-label': 'Deine Antwort' });
         const rueck = h('div', { class: 'ki-antwort', 'aria-live': 'polite' });
         const weiter = h('button', { class: 'knopf', disabled: true, onclick: () => { i++; zeige(); } }, 'Weiter');
-        const abgeben = h('button', { class: 'knopf' }, LA.kiVerfuegbar() ? 'Rückmeldung holen' : 'Musterantwort zeigen');
+        const abgeben = h('button', { class: 'knopf' }, LA.kiVerfuegbar() ? 'Rückmeldung holen' : 'Mit den Kriterien prüfen');
+        const punkteZeile = (pkt) => h('div', { class: 'punkte' }, '●'.repeat(pkt) + '○'.repeat(3 - pkt), ` ${pkt} / 3`);
+        const muster = () => h('details', null, h('summary', null, 'Musterantwort'), h('p', null, f.musterantwort));
+        // Zwei Runden: Rückmeldung mit Hinweis (ohne Lösung) → Antwort überarbeiten → zweite Rückmeldung
+        let erste = null;
         abgeben.addEventListener('click', async () => {
           if (!feld.value.trim()) { rueck.textContent = 'Schreib zuerst eine Antwort.'; return; }
-          abgeben.disabled = true;
           if (LA.kiVerfuegbar()) {
+            if (erste && feld.value.trim() === erste.antwort.trim()) { LA.meldung('Überarbeite zuerst deine Antwort. Der Hinweis oben hilft dir dabei.'); feld.focus(); return; }
+            abgeben.disabled = true;
+            const alt = Array.from(rueck.childNodes);
             rueck.textContent = 'Die KI liest deine Antwort …';
             try {
-              const r = await LA.antwortBewerten({ ...f, antwort: feld.value, stufe: p.stufe });
-              const pkt = Math.max(0, Math.min(3, r.punkte)); punkte += pkt;
-              LA.setzen(rueck, h('div', { class: 'punkte' }, '●'.repeat(pkt) + '○'.repeat(3 - pkt), ` ${pkt} / 3`), h('p', null, r.feedback), h('p', null, h('strong', null, 'Tipp: '), r.tipp),
-                h('details', null, h('summary', null, 'Musterantwort'), h('p', null, f.musterantwort)));
+              const r = await LA.antwortBewerten({ ...f, antwort: feld.value, stufe: p.stufe, vorher: erste });
+              const pkt = Math.max(0, Math.min(3, r.punkte));
+              if (!erste && pkt < 3) {
+                // Erste Runde: nur Hinweis, dann selbst verbessern
+                erste = { antwort: feld.value, feedback: r.feedback, tipp: r.tipp, punkte: pkt };
+                LA.setzen(rueck, punkteZeile(pkt), h('p', null, r.feedback), h('div', { class: 'kasten merksatz' }, h('div', { class: 'label' }, 'Hinweis'), r.tipp),
+                  h('p', { class: 'ueberarbeiten' }, h('strong', null, 'Jetzt du: '), 'Überarbeite deine Antwort oben und gib sie nochmals ab.'));
+                abgeben.textContent = 'Überarbeitete Antwort abgeben';
+                abgeben.disabled = false;
+                feld.focus();
+                return;
+              }
+              punkte += pkt;
+              LA.setzen(rueck,
+                erste ? h('div', { class: 'hinweis' }, `1. Fassung: ${erste.punkte} / 3 → überarbeitet: ${pkt} / 3`) : null,
+                punkteZeile(pkt),
+                erste && r.verbesserung ? h('p', null, h('strong', null, 'Das hast du verbessert: '), r.verbesserung) : null,
+                h('p', null, r.feedback), h('p', null, h('strong', null, 'Tipp: '), r.tipp), muster());
+              feld.readOnly = true;
               weiter.disabled = false;
-            } catch (e) { rueck.textContent = e.message; abgeben.disabled = false; }
+            } catch (e) { LA.setzen(rueck, ...alt, h('p', { class: 'rueckmeldung nein' }, e.message)); abgeben.disabled = false; }
+          } else if (!erste) {
+            // Ohne KI: zuerst anhand der Kriterien selbst prüfen und ergänzen, dann die Musterantwort
+            erste = { antwort: feld.value };
+            LA.setzen(rueck, h('div', { class: 'label' }, 'Darauf kommt es an'), h('ul', null, f.kriterien.map((k) => h('li', null, k))),
+              h('p', { class: 'ueberarbeiten' }, h('strong', null, 'Jetzt du: '), 'Fehlt etwas davon in deiner Antwort? Ergänze sie oben. Danach siehst du die Musterantwort.'));
+            abgeben.textContent = 'Musterantwort zeigen';
+            feld.focus();
           } else {
+            abgeben.disabled = true; feld.readOnly = true;
             const selbst = (pkt) => { punkte += pkt; weiter.disabled = false; weiter.click(); };
             LA.setzen(rueck, h('div', { class: 'label' }, 'Musterantwort'), h('p', null, f.musterantwort),
               h('div', { class: 'label' }, 'Darauf kommt es an'), h('ul', null, f.kriterien.map((k) => h('li', null, k))),
@@ -501,14 +535,29 @@
       const zaehler = h('span', { class: 'hinweis' }, '0 Wörter');
       feld.addEventListener('input', () => { zaehler.textContent = (feld.value.trim().split(/\s+/).filter(Boolean).length) + ' Wörter'; });
       const ausgabe = h('div', { 'aria-live': 'polite' });
+      // Runde 1: Fehler nur markieren und Regel nennen → selbst verbessern. Ab Runde 2: mit Lösung.
+      let runde = 0, letzterText = '', ersteAnzahl = 0;
       const knopf = h('button', { class: 'knopf', onclick: async () => {
         if (!LA.kiVerfuegbar()) { LA.setzen(ausgabe, h('div', { class: 'kasten' }, 'Für die Korrektur braucht es die KI. Die Lehrperson kann in den Einstellungen einen API-Schlüssel hinterlegen.')); return; }
         if (feld.value.trim().split(/\s+/).length < 5) { ausgabe.textContent = 'Schreib zuerst etwas mehr.'; return; }
+        if (runde === 1 && feld.value.trim() === letzterText.trim()) { LA.meldung('Verbessere zuerst die markierten Stellen in deinem Text.'); feld.focus(); return; }
         knopf.disabled = true; ausgabe.textContent = 'Die KI korrigiert deinen Text …';
         try {
-          const r = await LA.textKorrigieren({ aufgabe: a.aufgabe, text: feld.value, stufe: p.stufe, fachinhalt: p.kurzbeschreibung + ' ' + p.kapitel.map((k) => k.merksatz).join(' ') });
-          LA.setzen(ausgabe, korrekturAnsicht(feld.value, r));
-          fertig(Math.max(0, 10 - r.fehler.length), 10);
+          const text = feld.value;
+          const r = await LA.textKorrigieren({ aufgabe: a.aufgabe, text, stufe: p.stufe, fachinhalt: p.kurzbeschreibung + ' ' + p.kapitel.map((k) => k.merksatz).join(' ') });
+          runde++; letzterText = text;
+          if (runde === 1 && r.fehler.length) {
+            ersteAnzahl = r.fehler.length;
+            LA.setzen(ausgabe, h('div', { class: 'kasten merksatz ueberarbeiten' }, h('strong', null, 'Jetzt du: '),
+              `Die KI hat ${r.fehler.length} Stelle${r.fehler.length === 1 ? '' : 'n'} markiert. Verbessere sie oben direkt in deinem Text. Die Regel steht jeweils dabei, die Lösung noch nicht. Dann nochmals prüfen lassen.`),
+              korrekturAnsicht(text, r, { loesung: false }));
+            knopf.textContent = 'Überarbeiteten Text prüfen';
+          } else {
+            LA.setzen(ausgabe, runde > 1 ? h('p', { class: 'hinweis' }, `Vorher ${ersteAnzahl} Hinweis${ersteAnzahl === 1 ? '' : 'e'}, jetzt ${r.fehler.length}.`) : null,
+              korrekturAnsicht(text, r, { loesung: true }));
+            fertig(Math.max(0, 10 - r.fehler.length), 10);
+            knopf.textContent = 'Nochmals prüfen';
+          }
         } catch (e) { ausgabe.textContent = e.message; }
         knopf.disabled = false;
       } }, 'Korrigieren lassen');
@@ -517,7 +566,7 @@
     },
   };
 
-  function korrekturAnsicht(original, r) {
+  function korrekturAnsicht(original, r, { loesung = true } = {}) {
     // Fehlerstellen im Originaltext markieren (erste Fundstelle je Fehler, von hinten nach vorne)
     const treffer = [];
     let suchStart = 0;
@@ -533,17 +582,19 @@
     for (const t of treffer) {
       text.append(original.slice(p, t.pos));
       const f = r.fehler[t.n];
-      text.append(h('mark', { class: 'korr-' + f.art.toLowerCase(), title: `${f.art}: ${f.korrektur} – ${f.erklaerung}` }, original.slice(t.pos, t.ende), h('sup', null, t.n + 1)));
+      text.append(h('mark', { class: 'korr-' + f.art.toLowerCase(), title: loesung ? `${f.art}: ${f.korrektur} – ${f.erklaerung}` : `${f.art} – ${f.erklaerung}` }, original.slice(t.pos, t.ende), h('sup', null, t.n + 1)));
       p = t.ende;
     }
     text.append(original.slice(p));
     return h('div', { class: 'korrektur' },
       h('div', { class: 'label' }, `Dein Text · ${r.fehler.length} Hinweise`), text,
-      r.fehler.length ? h('ol', { class: 'korr-liste' }, r.fehler.map((f) => h('li', null, h('span', { class: 'tag korr-' + f.art.toLowerCase() }, f.art), ' ', h('s', null, f.original), ' → ', h('strong', null, f.korrektur), h('div', { class: 'hinweis' }, f.erklaerung)))) : h('p', null, 'Keine Fehler gefunden.'),
+      r.fehler.length ? h('ol', { class: 'korr-liste' }, r.fehler.map((f) => h('li', null, h('span', { class: 'tag korr-' + f.art.toLowerCase() }, f.art), ' ',
+        loesung ? [h('s', null, f.original), ' → ', h('strong', null, f.korrektur)] : h('span', null, '«', f.original, '»'),
+        h('div', { class: 'hinweis' }, f.erklaerung)))) : h('p', null, 'Keine Fehler gefunden.'),
       h('div', { class: 'kasten' }, h('div', { class: 'label' }, 'Das ist gelungen'), r.staerken),
       h('div', { class: 'kasten' }, h('div', { class: 'label' }, 'Inhalt'), r.inhalt),
       h('div', { class: 'kasten merksatz' }, h('div', { class: 'label' }, 'Dein Schwerpunkt fürs nächste Mal'), r.tipp),
-      h('details', null, h('summary', null, 'Korrigierte Fassung anzeigen'), h('div', { class: 'korr-text' }, r.korrigierter_text)));
+      loesung ? h('details', null, h('summary', null, 'Korrigierte Fassung anzeigen'), h('div', { class: 'korr-text' }, r.korrigierter_text)) : null);
   }
 
   LA.SPIELE = SPIELE;

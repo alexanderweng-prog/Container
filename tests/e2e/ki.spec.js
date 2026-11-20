@@ -52,24 +52,50 @@ test('KI-Fehler werden verständlich angezeigt', async ({ page }) => {
 });
 
 test('Textkorrektur, Denkfrage-Bewertung und Nachfrage im Lernpfad', async ({ page }) => {
-  await kiAttrappe(page, (body) => {
-    if (body.system.includes('korrigierst')) return { korrigierter_text: 'Das Wasser verdunstet.', fehler: [{ original: 'verdunsted', korrektur: 'verdunstet', art: 'Rechtschreibung', erklaerung: '3. Person: -t' }], staerken: 'Klar.', inhalt: 'Stimmt.', tipp: 'Endungen prüfen.' };
-    if (body.system.includes('Bewerte')) return { punkte: 2, feedback: 'Gut erkannt.', tipp: 'Nenne die Energie.' };
+  const anfragen = await kiAttrappe(page, (body) => {
+    const text = body.messages[0].content[0].text;
+    if (body.system.includes('korrigierst')) return text.includes('verdunsted')
+      ? { korrigierter_text: 'Das Wasser verdunstet.', fehler: [{ original: 'verdunsted', korrektur: 'verdunstet', art: 'Rechtschreibung', erklaerung: 'Verb in der 3. Person' }], staerken: 'Klar.', inhalt: 'Stimmt.', tipp: 'Endungen prüfen.' }
+      : { korrigierter_text: 'ok', fehler: [], staerken: 'Klar.', inhalt: 'Stimmt.', tipp: 'Weiter so.' };
+    if (body.system.includes('Bewerte')) return text.includes('<ueberarbeitete_fassung>')
+      ? { punkte: 3, feedback: 'Jetzt vollständig.', tipp: 'Gut so.', verbesserung: 'Du nennst jetzt die Energiequelle.' }
+      : { punkte: 2, feedback: 'Gut erkannt.', tipp: 'Woher kommt die Energie?', verbesserung: '' };
     return { antwort: 'Die **Sonne** liefert die Energie.' };
   });
   await page.getByRole('button', { name: /Demo ansehen/ }).click();
 
+  // Textkorrektur: zuerst nur markiert (ohne Lösung), selbst verbessern, dann mit Lösung
   await spielOeffnen(page, 'Schreiben');
   await page.locator('textarea').fill('Das Wasser verdunsted im Meer und steigt dann auf.');
   await page.getByRole('button', { name: 'Korrigieren lassen' }).click();
   await expect(page.locator('.korr-text mark')).toHaveText(/verdunsted/);
-  await expect(page.locator('.korr-liste')).toContainText('verdunstet');
+  await expect(page.locator('.korr-liste')).toContainText('Verb in der 3. Person');
+  await expect(page.locator('.korr-liste')).not.toContainText('verdunstet');
+  await expect(page.getByText('Korrigierte Fassung anzeigen')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Überarbeiteten Text prüfen' }).click(); // unverändert: keine neue Anfrage
+  await expect(page.locator('.toast').last()).toContainText('Verbessere zuerst');
+  expect(anfragen.filter((a) => a.body.system.includes('korrigierst')).length).toBe(1);
+  await page.locator('textarea').fill('Das Wasser verdunstet im Meer und steigt dann auf.');
+  await page.getByRole('button', { name: 'Überarbeiteten Text prüfen' }).click();
+  await expect(page.getByText('Vorher 1 Hinweis, jetzt 0.')).toBeVisible();
   await zurueck(page);
 
+  // Denkfrage: Hinweis ohne Musterantwort → überarbeiten → zweite Bewertung
   await spielOeffnen(page, 'Denkfragen');
   await page.locator('textarea').fill('Weil Wasser verdunstet.');
   await page.getByRole('button', { name: 'Rückmeldung holen' }).click();
   await expect(page.locator('.punkte')).toContainText('2 / 3');
+  await expect(page.locator('.ki-antwort')).toContainText('Woher kommt die Energie?');
+  await expect(page.locator('.ki-antwort')).not.toContainText('Musterantwort');
+  await expect(page.getByRole('button', { name: 'Weiter' })).toBeDisabled();
+  await page.locator('textarea').fill('Weil die Sonne das Wasser erwärmt und es verdunstet.');
+  await page.getByRole('button', { name: 'Überarbeitete Antwort abgeben' }).click();
+  await expect(page.locator('.ki-antwort')).toContainText('1. Fassung: 2 / 3 → überarbeitet: 3 / 3');
+  await expect(page.locator('.ki-antwort')).toContainText('Das hast du verbessert: Du nennst jetzt die Energiequelle.');
+  await expect(page.locator('.ki-antwort')).toContainText('Musterantwort');
+  await expect(page.getByRole('button', { name: 'Weiter' })).toBeEnabled();
+  const zweite = anfragen.filter((a) => a.body.system.includes('Bewerte')).at(-1).body.messages[0].content[0].text;
+  expect(zweite).toContain('<erste_fassung>\nWeil Wasser verdunstet.');
   await zurueck(page);
 
   await spielOeffnen(page, 'Lernpfad');

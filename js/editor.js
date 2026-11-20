@@ -43,16 +43,28 @@
       feld(q, 'frage', 'Frage', { breit: true }),
       h('div', { class: 'ed-optionen' },
         h('span', { class: 'hinweis' }, 'Antworten – die richtige anklicken:'),
-        q.optionen.map((o, i) => h('div', { class: 'ed-option' },
-          h('input', { type: 'radio', name, checked: q.richtig === i, 'aria-label': `Antwort ${i + 1} ist richtig`, onchange: () => { q.richtig = i; } }),
-          (() => { const el = h('input', { type: 'text', value: o, 'aria-label': `Antwort ${i + 1}` }); el.addEventListener('input', () => { q.optionen[i] = el.value; }); return el; })(),
-          q.optionen.length > 2 ? h('button', { class: 'mini', type: 'button', 'aria-label': `Antwort ${i + 1} entfernen`, onclick: () => {
-            q.optionen.splice(i, 1);
-            if (q.richtig === i) q.richtig = 0; else if (q.richtig > i) q.richtig--;
-            zeichne();
-          } }, '✕') : null)),
-        q.optionen.length < 6 ? h('button', { class: 'knopf sekundaer klein', type: 'button', onclick: () => { q.optionen.push(''); zeichne(); } }, '+ Antwort') : null),
-      feld(q, 'erklaerung', 'Erklärung (erscheint nach der Antwort)', { breit: true }),
+        q.optionen.map((o, i) => h('div', { class: 'ed-option-block' },
+          h('div', { class: 'ed-option' },
+            h('input', { type: 'radio', name, checked: q.richtig === i, 'aria-label': `Antwort ${i + 1} ist richtig`, onchange: () => { q.richtig = i; zeichne(); } }),
+            (() => { const el = h('input', { type: 'text', value: o, 'aria-label': `Antwort ${i + 1}` }); el.addEventListener('input', () => { q.optionen[i] = el.value; }); return el; })(),
+            q.optionen.length > 2 ? h('button', { class: 'mini', type: 'button', 'aria-label': `Antwort ${i + 1} entfernen`, onclick: () => {
+              q.optionen.splice(i, 1);
+              if (Array.isArray(q.rueckmeldungen)) q.rueckmeldungen.splice(i, 1);
+              if (q.richtig === i) q.richtig = 0; else if (q.richtig > i) q.richtig--;
+              zeichne();
+            } }, '✕') : null),
+          // Rückmeldung, wenn genau diese falsche Antwort gewählt wird
+          q.richtig === i ? null : (() => {
+            const el = h('input', { type: 'text', class: 'ed-warum', value: (q.rueckmeldungen && q.rueckmeldungen[i]) || '', placeholder: 'Warum stimmt diese Antwort nicht? (optional, erscheint wenn gewählt)', 'aria-label': `Rückmeldung zu Antwort ${i + 1}` });
+            el.addEventListener('input', () => {
+              if (!Array.isArray(q.rueckmeldungen)) q.rueckmeldungen = [];
+              while (q.rueckmeldungen.length < q.optionen.length) q.rueckmeldungen.push('');
+              q.rueckmeldungen[i] = el.value;
+            });
+            return el;
+          })())),
+        q.optionen.length < 6 ? h('button', { class: 'knopf sekundaer klein', type: 'button', onclick: () => { q.optionen.push(''); if (Array.isArray(q.rueckmeldungen)) q.rueckmeldungen.push(''); zeichne(); } }, '+ Antwort') : null),
+      feld(q, 'erklaerung', 'Erklärung, warum die richtige Antwort stimmt', { breit: true }),
       mitStufe ? stufenWahl(q) : null);
   }
 

@@ -96,8 +96,12 @@ test('Wahr oder falsch, Reihenfolge, Zuordnen', async ({ page }) => {
   await expect(page.locator('.rueckmeldung')).toContainText(/von 10 richtig zugeordnet/);
 });
 
-test('Denkfragen ohne KI: Musterantwort und Selbsteinschätzung', async ({ page }) => {
+test('Denkfragen ohne KI: erst Kriterien und ergänzen, dann Musterantwort und Selbsteinschätzung', async ({ page }) => {
   await spielOeffnen(page, 'Denkfragen');
+  await page.locator('textarea').fill('Weil Wasser verdunstet.');
+  await page.getByRole('button', { name: 'Mit den Kriterien prüfen' }).click();
+  await expect(page.locator('.ki-antwort')).toContainText('Darauf kommt es an');
+  await expect(page.locator('.ki-antwort .label', { hasText: 'Musterantwort' })).toHaveCount(0); // noch nicht verraten
   await page.locator('textarea').fill('Weil Wasser verdunstet und dabei Energie braucht.');
   await page.getByRole('button', { name: 'Musterantwort zeigen' }).click();
   await expect(page.locator('.ki-antwort')).toContainText('Musterantwort');
@@ -108,4 +112,23 @@ test('Denkfragen ohne KI: Musterantwort und Selbsteinschätzung', async ({ page 
 test('Vorlese-Knöpfe sind vorhanden', async ({ page }) => {
   await spielOeffnen(page, 'Lernpfad');
   await expect(page.locator('.vorlesen')).toHaveCount(2);
+});
+
+test('Multiple Choice: Rückmeldung erklärt, warum die gewählte falsche Antwort nicht stimmt', async ({ page }) => {
+  await spielOeffnen(page, 'Multiple Choice');
+  for (let i = 0; i < 6; i++) {
+    const frage = await page.locator('.mc .frage span').innerText();
+    if (frage === 'Woraus bestehen Wolken?') {
+      await page.locator('.option', { hasText: /^Aus Wasserdampf$/ }).click();
+      await sicher(page);
+      await expect(page.locator('.rueckmeldung')).toContainText('Warum nicht «Aus Wasserdampf»?');
+      await expect(page.locator('.rueckmeldung')).toContainText('Wasserdampf ist ein unsichtbares Gas');
+      await expect(page.locator('.rueckmeldung')).toContainText('Richtig ist «Aus winzigen Wassertröpfchen oder Eiskristallen»');
+      return;
+    }
+    await page.locator('.option').first().click();
+    await sicher(page);
+    await page.locator('.reihe.rechts .knopf').click();
+  }
+  throw new Error('Frage nicht gefunden');
 });

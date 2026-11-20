@@ -229,3 +229,14 @@ test('Lernkartei: geratene Treffer gelten nicht als gelernt, sichere Fehler werd
   const morgen = new Date(); morgen.setDate(morgen.getDate() + 1);
   assert.equal(s['mc:0'].faellig, `${morgen.getFullYear()}-${String(morgen.getMonth() + 1).padStart(2, '0')}-${String(morgen.getDate()).padStart(2, '0')}`);
 });
+
+test('Multiple Choice: Rückmeldungen pro Option bleiben beim Bereinigen richtig zugeordnet', () => {
+  const LA = laden('util.js', 'ki.js');
+  const p = LA.paketPruefen({ multiple_choice: [{ frage: 'F?', optionen: ['A', '', 'C', 'D'], richtig: 2, erklaerung: 'weil C', rueckmeldungen: ['nicht A', 'leer', 'soll weg', 'nicht D'] }] });
+  const q = p.multiple_choice[0];
+  assert.deepEqual(q.optionen, ['A', 'C', 'D']);
+  assert.equal(q.richtig, 1);
+  assert.deepEqual(q.rueckmeldungen, ['nicht A', '', 'nicht D'], 'leere Option entfernt, bei der richtigen keine Rückmeldung');
+  // Ohne Rückmeldungen: Feld fehlt (ältere Pakete)
+  assert.equal('rueckmeldungen' in LA.paketPruefen({ multiple_choice: [{ frage: 'F?', optionen: ['A', 'B'], richtig: 0 }] }).multiple_choice[0], false);
+});
