@@ -105,6 +105,8 @@ Eine Bewertung oder Textkorrektur kostet einen Bruchteil davon. Die echten Koste
 **Kurzlink mit QR-Code (empfohlen):** In der Paketübersicht «Teilen» → «Kurzlink mit QR-Code erstellen». Du bekommst einen kurzen Link wie `…/#p=k7m2xq9` und einen QR-Code. «QR gross für Beamer» zeigt ihn bildschirmfüllend, die Klasse scannt ihn mit dem Handy oder Tablet.
 
 - Bei Paketen mit Niveaus: «Alle Niveaus» (die Lernenden wählen selbst) oder je Niveau ein eigener Kurzlink.
+- **Ein Kurzlink pro Klasse:** Beim Erstellen den Klassennamen eingeben (z. B. «2a»). Für weitere Klassen «+ Kurzlink für eine weitere Klasse». Die Antworten werden pro Link gezählt; in der Auswertung lässt sich jede Klasse einzeln oder alle zusammen anzeigen.
+- **Meine Kurzlinks** (Startseite): alle in diesem Browser erstellten Links mit Anzahl Aufrufe, QR-Code, Auswertung der Klasse, Umbenennen und Löschen. Ein gelöschter Link funktioniert nicht mehr; die gezählten Antworten bleiben.
 - **Korrekturen kommen an:** Speicherst du das Paket später im Editor, wird der Inhalt hinter dem Kurzlink automatisch ersetzt. Das klappt nur aus dem Browser, in dem du den Kurzlink erstellt hast (dort liegt der Bearbeitungsschlüssel).
 - Die Lernenden sollten den Link als Lesezeichen speichern. Lernkartei und Flow-Stufe bleiben auf ihrem Gerät erhalten.
 - Gespeichert wird das Paket in Supabase (Tabelle `lw_pakete`, gleiches Projekt wie die Auswertung). Abrufen kann es nur, wer den Code kennt. Eine Liste aller Pakete gibt es nicht. Der Bearbeitungsschlüssel liegt dort nur als Prüfsumme. **Nur für Unterrichtsmaterial ohne Namen oder Persönliches.**

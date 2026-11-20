@@ -4,7 +4,7 @@
   const PAKETE_KEY = 'lernapp.pakete';
   const main = () => document.getElementById('inhalt');
 
-  const zustand = { paket: null, schuelerModus: false, gruppe: null };
+  const zustand = { paket: null, schuelerModus: false, gruppe: null, kurz: '' };
 
   /* ---------- Niveaus: Pakete derselben Gruppe ---------- */
   function gruppeVon(p) {
@@ -57,7 +57,7 @@
 
   /* ---------- Start: Paketliste ---------- */
   function startAnsicht() {
-    zustand.paket = null; zustand.schuelerModus = false; zustand.gruppe = null; kopf();
+    zustand.paket = null; zustand.schuelerModus = false; zustand.gruppe = null; zustand.kurz = ''; kopf();
     const liste = pakete();
     const dateiInput = h('input', { type: 'file', accept: '.json,application/json', hidden: true, onchange: async (e) => {
       try {
@@ -76,7 +76,8 @@
           h('button', { class: 'knopf', onclick: erstellenAnsicht }, '+ Neues Lernpaket'),
           h('button', { class: 'knopf sekundaer', onclick: () => paketAnsicht(LA.paketPruefen(structuredClone(LA.DEMO))) }, 'Demo ansehen (Wasserkreislauf)'),
           h('button', { class: 'knopf sekundaer', onclick: () => dateiInput.click() }, 'Paket importieren'), dateiInput,
-          h('button', { class: 'knopf sekundaer', onclick: () => auswertungAnsicht() }, '📊 Auswertung'))),
+          h('button', { class: 'knopf sekundaer', onclick: () => auswertungAnsicht() }, '📊 Auswertung'),
+          LA.kurzlinksAlle && LA.kurzlinksAlle().length ? h('button', { class: 'knopf sekundaer', onclick: kurzlinksAnsicht }, '🔗 Meine Kurzlinks') : null)),
       h('section', null,
         h('h2', null, 'Meine Lernpakete'),
         liste.length ? h('div', { class: 'karten' }, liste.filter((p, i) => !p.gruppe || liste.findIndex((x) => x.gruppe === p.gruppe) === i).map((p0) => {
@@ -200,7 +201,7 @@
     zustand.paket = p; kopf();
     niveauMerken(p);
     const gruppe = gruppeVon(p);
-    gruppe.forEach(LA.statistikPaket); // Antworten dieser Pakete dürfen anonym gezählt werden
+    gruppe.forEach((x) => LA.statistikPaket(x, zustand.kurz || '')); // Antworten dieser Pakete dürfen anonym gezählt werden
     const empfohlen = LA.flowEmpfehlung(gruppe);
     const f = fortschritt(p.id);
     const verfuegbar = p.spiele.filter((s) => LA.SPIELE[s] && LA.SPIELE[s].moeglich(p));
@@ -291,38 +292,49 @@
 
     /* Kurzlink mit QR-Code (empfohlen) */
     const kurz = h('div', { class: 'kurz-bereich' });
-    const kurzZeigen = (code) => {
-      const url = LA.kurzlinkUrl(code);
-      LA.setzen(kurz,
-        h('div', { class: 'kurz-ergebnis' },
-          h('div', { class: 'qr-klein', html: LA.qrSvg(url) }),
-          h('div', { class: 'kurz-text' },
-            h('div', { class: 'label' }, 'Kurzlink'),
-            h('input', { type: 'text', readonly: true, value: url, class: 'kurz-url', 'aria-label': 'Kurzlink', onclick: (e) => e.target.select() }),
-            h('div', { class: 'reihe' },
-              h('button', { class: 'knopf', onclick: async () => { try { await navigator.clipboard.writeText(url); LA.meldung('Link kopiert.'); } catch { LA.meldung('Bitte manuell kopieren (Ctrl+C).'); } } }, 'Link kopieren'),
-              h('button', { class: 'knopf sekundaer', onclick: () => LA.qrVollbild(url, p.titel) }, 'QR gross für Beamer')),
-            h('p', { class: 'hinweis' }, 'Änderungen, die du später im Editor speicherst, kommen automatisch bei allen an, die diesen Link öffnen.'))));
+    let gewaehlt = null; // angezeigter Kurzlink (Code)
+    const kurzZeigen = (e) => {
+      const url = LA.kurzlinkUrl(e.code);
+      return h('div', { class: 'kurz-ergebnis' },
+        h('div', { class: 'qr-klein', html: LA.qrSvg(url) }),
+        h('div', { class: 'kurz-text' },
+          h('div', { class: 'label' }, 'Kurzlink · ' + LA.kurzlinkName(e)),
+          h('input', { type: 'text', readonly: true, value: url, class: 'kurz-url', 'aria-label': 'Kurzlink', onclick: (ev) => ev.target.select() }),
+          h('div', { class: 'reihe' },
+            h('button', { class: 'knopf', onclick: async () => { try { await navigator.clipboard.writeText(url); LA.meldung('Link kopiert.'); } catch { LA.meldung('Bitte manuell kopieren (Ctrl+C).'); } } }, 'Link kopieren'),
+            h('button', { class: 'knopf sekundaer', onclick: () => LA.qrVollbild(url, p.titel + (e.klasse ? ' · ' + e.klasse : '')) }, 'QR gross für Beamer')),
+          h('p', { class: 'hinweis' }, 'Änderungen, die du später im Editor speicherst, kommen automatisch bei allen an, die diesen Link öffnen.')));
+    };
+    const neuFormular = (erster) => {
+      const klasse = h('input', { type: 'text', class: 'kurz-klasse', maxlength: 60, placeholder: 'z. B. 2a oder «Gruppe Montag»', 'aria-label': 'Klasse' });
+      const knopf = h('button', { class: 'knopf' + (erster ? '' : ' sekundaer'), onclick: async () => {
+        knopf.disabled = true; knopf.textContent = 'Wird erstellt …';
+        try { gewaehlt = await LA.kurzlinkErstellen(auswahl, klasse.value); kurzVorbereiten(); }
+        catch (err) { LA.meldung(err.message, 'fehler'); knopf.disabled = false; knopf.textContent = 'Kurzlink mit QR-Code erstellen'; }
+      } }, 'Kurzlink mit QR-Code erstellen');
+      return h('div', { class: 'kurz-neu' },
+        h('label', { class: 'ed-feld breit' }, h('span', null, erster ? 'Für welche Klasse? (optional)' : 'Weitere Klasse'), klasse),
+        h('p', { class: 'hinweis' }, 'Mit einem eigenen Link pro Klasse zeigt die Auswertung jede Klasse getrennt.'),
+        knopf);
     };
     const kurzVorbereiten = async () => {
       if (!LA.kurzlinkMoeglich()) {
         LA.setzen(kurz, h('p', { class: 'hinweis' }, location.protocol === 'file:' ? 'Kurzlinks gibt es nur, wenn die App über eine Webadresse läuft.' : 'Kurzlinks sind nicht eingerichtet.'));
         return;
       }
-      const vorhanden = LA.kurzlinkVorhanden(auswahl);
-      if (vorhanden) {
-        kurzZeigen(vorhanden.code);
-        // Inhalt still auf den neuesten Stand bringen
-        LA.kurzlinkAktualisieren(auswahl).catch(() => {});
+      const links = LA.kurzlinksFuer(auswahl);
+      if (!links.length) {
+        LA.setzen(kurz, neuFormular(true), h('p', { class: 'hinweis' }, 'Dafür wird das Paket in der Datenbank der Lernwerkstatt gespeichert. Wer den Link kennt, kann es öffnen. Nur für Unterrichtsmaterial ohne Namen oder Persönliches.'));
         return;
       }
-      const knopf = h('button', { class: 'knopf', onclick: async () => {
-        knopf.disabled = true; knopf.textContent = 'Wird erstellt …';
-        try { kurzZeigen(await LA.kurzlinkErstellen(auswahl)); }
-        catch (e) { LA.meldung(e.message, 'fehler'); knopf.disabled = false; knopf.textContent = 'Kurzlink mit QR-Code erstellen'; }
-      } }, 'Kurzlink mit QR-Code erstellen');
-      LA.setzen(kurz, knopf, h('p', { class: 'hinweis' }, 'Dafür wird das Paket in der Datenbank der Lernwerkstatt gespeichert. Wer den Link kennt, kann es öffnen. Nur für Unterrichtsmaterial ohne Namen oder Persönliches.'));
+      const aktiv = links.find((e) => e.code === gewaehlt) || links[0];
+      LA.setzen(kurz,
+        links.length > 1 ? h('div', { class: 'kurz-wahl reihe', role: 'group', 'aria-label': 'Kurzlinks dieses Pakets' },
+          links.map((e) => h('button', { class: 'tab' + (e.code === aktiv.code ? ' aktiv' : ''), 'aria-pressed': e.code === aktiv.code, onclick: () => { gewaehlt = e.code; kurzVorbereiten(); } }, LA.kurzlinkName(e)))) : null,
+        kurzZeigen(aktiv),
+        h('details', { class: 'kurz-weitere' }, h('summary', null, '+ Kurzlink für eine weitere Klasse'), neuFormular(false)));
     };
+    const kurzStillAktualisieren = () => { if (LA.kurzlinkMoeglich() && LA.kurzlinksFuer(auswahl).length) LA.kurzlinkAktualisieren(auswahl).catch(() => {}); };
 
     /* Langer Link (ohne Datenbank) */
     const feld = h('textarea', { rows: 3, readonly: true });
@@ -336,13 +348,14 @@
 
     const wahl = gruppe.length > 1 ? h('select', { 'aria-label': 'Was teilen?', onchange: (e) => {
       auswahl = e.target.value === 'alle' ? gruppe : gruppe.find((x) => x.id === e.target.value);
-      kurzVorbereiten(); langBauen();
+      gewaehlt = null; kurzVorbereiten(); kurzStillAktualisieren(); langBauen();
     } },
       h('option', { value: 'alle' }, 'Alle Niveaus – die Lernenden wählen selbst'),
       gruppe.map((x) => h('option', { value: x.id }, 'Nur ' + niveauText(x) + ' (' + LA.NIVEAUS[x.niveau].lang + ')'))) : null;
 
     await langBauen();
     kurzVorbereiten();
+    kurzStillAktualisieren(); // Inhalt bestehender Links auf den neuesten Stand bringen
     dialog('Paket teilen', [
       wahl ? h('label', { class: 'ed-feld breit' }, h('span', null, 'Was teilen?'), wahl) : null,
       h('p', null, 'Die Lernenden öffnen den Link oder scannen den QR-Code und sehen nur die Lernansicht.'),
@@ -398,12 +411,64 @@
   }
 
   /* ---------- Auswertung (öffentlich, anonym) ---------- */
-  function auswertungAnsicht(nurPakete, zurueck) {
+  function auswertungAnsicht(nurPakete, zurueck, nurKurz) {
     LA.vorlesenStoppen();
-    zustand.paket = null; zustand.schuelerModus = false; kopf();
+    zustand.paket = null; zustand.schuelerModus = false; zustand.kurz = ''; kopf();
     // Gesamtauswertung bekommt eine eigene Adresse, die man weitergeben kann
     try { history.replaceState(null, '', nurPakete ? location.pathname + location.search : '#auswertung'); } catch { /* egal */ }
-    LA.auswertung(main(), { nurPakete, zurueck: zurueck || (() => { try { history.replaceState(null, '', location.pathname + location.search); } catch { /* egal */ } startAnsicht(); }) });
+    LA.auswertung(main(), { nurPakete, nurKurz, zurueck: zurueck || (() => { try { history.replaceState(null, '', location.pathname + location.search); } catch { /* egal */ } startAnsicht(); }) });
+    window.scrollTo({ top: 0 });
+  }
+
+  /* ---------- Meine Kurzlinks ---------- */
+  function kurzlinksAnsicht() {
+    LA.vorlesenStoppen();
+    zustand.paket = null; zustand.schuelerModus = false; zustand.kurz = ''; kopf();
+    const status = h('p', { class: 'hinweis', 'aria-live': 'polite' });
+    const liste = h('div', { class: 'kl-liste' });
+    let info = new Map();
+    const datum = (x) => (x ? new Date(x).toLocaleDateString('de-CH') : '–');
+    const zeichnen = () => {
+      const alle = LA.kurzlinksAlle().sort((a, b) => String(b.erstellt).localeCompare(String(a.erstellt)));
+      if (!alle.length) { LA.setzen(liste, h('p', { class: 'hinweis' }, 'Keine Kurzlinks in diesem Browser.')); return; }
+      LA.setzen(liste, alle.map((e) => {
+        const url = LA.kurzlinkUrl(e.code), i = info.get(e.code);
+        const weg = info.size && !i; // in der Datenbank nicht (mehr) vorhanden
+        return h('div', { class: 'kl-eintrag' + (weg ? ' gedimmt' : '') },
+          h('div', { class: 'kl-kopf' },
+            h('div', null, h('div', { class: 'karte-titel' }, e.titel || (i && i.titel) || 'Lernpaket'),
+              h('div', { class: 'hinweis' }, `Klasse: ${LA.kurzlinkName(e)} · erstellt ${datum(e.erstellt)}` + (i ? ` · ${i.abrufe}× geöffnet · zuletzt geändert ${datum(i.aktualisiert)}` : weg ? ' · nicht mehr in der Datenbank' : ''))),
+            h('code', { class: 'kl-code' }, '#p=' + e.code)),
+          h('div', { class: 'reihe' },
+            h('button', { class: 'knopf klein', onclick: () => LA.qrVollbild(url, (e.titel || 'Lernpaket') + (e.klasse ? ' · ' + e.klasse : '')) }, 'QR-Code'),
+            h('button', { class: 'knopf sekundaer klein', onclick: async () => { try { await navigator.clipboard.writeText(url); LA.meldung('Link kopiert.'); } catch { prompt('Link kopieren:', url); } } }, 'Link kopieren'),
+            h('button', { class: 'knopf sekundaer klein', onclick: () => auswertungAnsicht(null, kurzlinksAnsicht, e.code) }, 'Auswertung'),
+            h('button', { class: 'knopf sekundaer klein', onclick: async () => {
+              const neu = prompt('Klassenname für diesen Link:', e.klasse || '');
+              if (neu === null) return;
+              try { if (await LA.kurzlinkUmbenennen(e.code, neu)) { LA.meldung('Umbenannt.'); zeichnen(); } else LA.meldung('Umbenennen nicht möglich (Link gelöscht?).', 'fehler'); }
+              catch (err) { LA.meldung(err.message, 'fehler'); }
+            } }, 'Umbenennen'),
+            h('button', { class: 'knopf sekundaer klein gefahr', onclick: async () => {
+              if (!confirm(`Kurzlink «${LA.kurzlinkName(e)}» (${e.code}) löschen? Wer ihn öffnet, bekommt danach eine Fehlermeldung. Die gezählten Antworten bleiben in der Auswertung.`)) return;
+              try { await LA.kurzlinkLoeschen(e.code); LA.meldung('Kurzlink gelöscht.'); zeichnen(); }
+              catch (err) { LA.meldung(err.message + ' Nichts gelöscht.', 'fehler'); }
+            } }, 'Löschen')));
+      }));
+    };
+    const laden = async () => {
+      status.textContent = 'Lädt Aufrufe …';
+      try { info = await LA.kurzlinksInfo(LA.kurzlinksAlle().map((e) => e.code)); status.textContent = ''; }
+      catch (err) { info = new Map(); status.textContent = err.message + ' Aufrufe werden nicht angezeigt.'; }
+      zeichnen();
+    };
+    LA.setzen(main(),
+      h('button', { class: 'zurueck', onclick: startAnsicht }, '← Zurück'),
+      h('h1', null, 'Meine Kurzlinks'),
+      h('p', { class: 'intro' }, 'Alle Kurzlinks, die in diesem Browser erstellt wurden. Ändern und löschen geht nur hier: Der Bearbeitungsschlüssel ist in diesem Browser gespeichert, auf anderen Geräten fehlt er.'),
+      status, liste);
+    zeichnen();
+    laden();
     window.scrollTo({ top: 0 });
   }
 
@@ -460,6 +525,7 @@
       try {
         const daten = await LA.kurzlinkLaden(kurzcode[1]);
         zustand.schuelerModus = true;
+        zustand.kurz = kurzcode[1].toLowerCase(); // Antworten zählen für diese Klasse
         if (Array.isArray(daten)) { zustand.gruppe = daten.map((x) => LA.paketPruefen(x)); paketAnsicht(bevorzugtesNiveau(zustand.gruppe)); }
         else paketAnsicht(LA.paketPruefen(daten));
         return;

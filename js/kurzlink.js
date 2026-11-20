@@ -26,28 +26,42 @@
     return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
-  const alle = () => LA.speicher.lesen(KEY, {});
-  // Welche Auswahl geteilt wurde: ganze Niveau-Gruppe oder einzelnes Paket
+  /* Gespeichert in diesem Browser: Liste [{ code, token, auswahl, titel, klasse, erstellt }].
+     «auswahl» sagt, was geteilt wurde: 'gruppe:<id>' (alle Niveaus) oder 'paket:<id>'. */
+  function alle() {
+    const roh = LA.speicher.lesen(KEY, []);
+    if (Array.isArray(roh)) return roh;
+    // ältere Fassung: ein Objekt { auswahl: { code, token, erstellt } }
+    return Object.entries(roh || {}).map(([auswahl, e]) => ({ titel: '', klasse: '', ...e, auswahl }));
+  }
+  const schreiben = (liste) => LA.speicher.schreiben(KEY, liste);
+  LA.kurzlinksAlle = alle;
+
   LA.kurzlinkSchluessel = (inhalt) => (Array.isArray(inhalt) ? 'gruppe:' + inhalt[0].gruppe : 'paket:' + inhalt.id);
-  LA.kurzlinkVorhanden = (inhalt) => alle()[LA.kurzlinkSchluessel(inhalt)] || null;
+  // Alle Kurzlinks einer Auswahl, neueste zuerst
+  LA.kurzlinksFuer = (inhalt) => alle().filter((e) => e.auswahl === LA.kurzlinkSchluessel(inhalt)).sort((a, b) => String(b.erstellt).localeCompare(String(a.erstellt)));
+  LA.kurzlinkVorhanden = (inhalt) => LA.kurzlinksFuer(inhalt)[0] || null;
   LA.kurzlinkUrl = (code) => location.origin + location.pathname + '#p=' + code;
+  LA.kurzlinkName = (e) => (e && e.klasse ? e.klasse : 'ohne Klassenname');
   const titelVon = (inhalt) => (Array.isArray(inhalt) ? inhalt[0].titel : inhalt.titel) || 'Lernpaket';
 
-  LA.kurzlinkErstellen = async function (inhalt) {
+  LA.kurzlinkErstellen = async function (inhalt, klasse = '') {
     const token = zufallsSchluessel();
-    const code = await rpc('lw_paket_teilen', { p_daten: inhalt, p_titel: titelVon(inhalt), p_token: token });
+    klasse = String(klasse || '').trim().slice(0, 60);
+    const code = await rpc('lw_paket_teilen', { p_daten: inhalt, p_titel: titelVon(inhalt), p_token: token, p_klasse: klasse });
     if (!/^[a-z2-9]{7}$/.test(code)) throw new Error('Unerwartete Antwort vom Kurzlink-Dienst.');
-    const a = alle();
-    a[LA.kurzlinkSchluessel(inhalt)] = { code, token, erstellt: new Date().toISOString() };
-    LA.speicher.schreiben(KEY, a);
+    schreiben([...alle(), { code, token, auswahl: LA.kurzlinkSchluessel(inhalt), titel: titelVon(inhalt), klasse, erstellt: new Date().toISOString() }]);
     return code;
   };
 
-  // Inhalt hinter einem bestehenden Kurzlink ersetzen (z. B. nach Korrekturen im Editor)
+  // Inhalt hinter allen Kurzlinks dieser Auswahl ersetzen (z. B. nach Korrekturen im Editor). Gibt die Anzahl zurück.
   LA.kurzlinkAktualisieren = async function (inhalt) {
-    const eintrag = LA.kurzlinkVorhanden(inhalt);
-    if (!eintrag) return false;
-    return !!(await rpc('lw_paket_aktualisieren', { p_code: eintrag.code, p_daten: inhalt, p_titel: titelVon(inhalt), p_token: eintrag.token }));
+    let n = 0;
+    for (const e of LA.kurzlinksFuer(inhalt)) {
+      if (await rpc('lw_paket_aktualisieren', { p_code: e.code, p_daten: inhalt, p_titel: titelVon(inhalt), p_token: e.token })) n++;
+    }
+    if (n) schreiben(alle().map((e) => (e.auswahl === LA.kurzlinkSchluessel(inhalt) ? { ...e, titel: titelVon(inhalt) } : e)));
+    return n;
   };
 
   // Nach dem Speichern: alle Kurzlinks aktualisieren, in denen dieses Paket steckt
@@ -57,9 +71,35 @@
     if (gruppe && gruppe.length > 1) kandidaten.push(gruppe);
     let n = 0;
     for (const inhalt of kandidaten) {
-      try { if (LA.kurzlinkVorhanden(inhalt) && await LA.kurzlinkAktualisieren(inhalt)) n++; } catch { /* offline: beim nächsten Teilen */ }
+      try { n += await LA.kurzlinkAktualisieren(inhalt); } catch { /* offline: beim nächsten Teilen */ }
     }
     return n;
+  };
+
+  LA.kurzlinkUmbenennen = async function (code, klasse) {
+    const e = alle().find((x) => x.code === code);
+    if (!e) return false;
+    klasse = String(klasse || '').trim().slice(0, 60);
+    const ok = await rpc('lw_paket_aktualisieren', { p_code: code, p_daten: null, p_titel: null, p_token: e.token, p_klasse: klasse });
+    if (ok) schreiben(alle().map((x) => (x.code === code ? { ...x, klasse } : x)));
+    return !!ok;
+  };
+
+  // Löschen: Link funktioniert danach nicht mehr. Gezählte Antworten bleiben in der Auswertung.
+  LA.kurzlinkLoeschen = async function (code) {
+    const e = alle().find((x) => x.code === code);
+    if (!e) return false;
+    const ok = await rpc('lw_paket_loeschen', { p_code: code, p_token: e.token });
+    // Auch wenn es den Link in der Datenbank schon nicht mehr gibt: aus der eigenen Liste entfernen
+    schreiben(alle().filter((x) => x.code !== code));
+    return !!ok;
+  };
+
+  // Aufrufe und Klassennamen aus der Datenbank (nur für bekannte Codes)
+  LA.kurzlinksInfo = async function (codes) {
+    if (!codes.length || !LA.kurzlinkMoeglich()) return new Map();
+    const zeilen = await rpc('lw_kurzlinks_info', { p_codes: codes.slice(0, 300) });
+    return new Map((zeilen || []).map((z) => [z.code, z]));
   };
 
   // Laden für Lernende; letzte Fassung wird gemerkt, damit es auch offline öffnet

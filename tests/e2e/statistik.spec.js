@@ -41,7 +41,7 @@ test('Antworten werden anonym gemeldet, Wiederholungen markiert', async ({ page 
   const m = meldungen[0];
   expect(m.url).toBe(SUPABASE + '/rest/v1/rpc/lw_statistik_melden');
   expect(m.headers.apikey).toMatch(/^sb_publishable_/);
-  expect(Object.keys(m.body).sort()).toEqual(['p_art', 'p_frage', 'p_karte', 'p_paket', 'p_richtig', 'p_titel', 'p_wiederholung']);
+  expect(Object.keys(m.body).sort()).toEqual(['p_art', 'p_frage', 'p_karte', 'p_kurz', 'p_paket', 'p_richtig', 'p_titel', 'p_wiederholung']);
   expect(m.body).toMatchObject({ p_paket: 'paket-test', p_titel: 'Testpaket', p_art: 'wf', p_wiederholung: false });
   expect(meldungen.filter((x) => !x.body.p_richtig).length).toBe(3);
 

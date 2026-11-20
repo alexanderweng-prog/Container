@@ -25,9 +25,10 @@
   };
   LA.statistikEinstellen = (an) => LA.speicher.schreiben('lernapp.statistik', an ? 'an' : 'aus');
 
-  // Pakete, deren Fragen gemeldet werden dürfen (die App trägt sie beim Öffnen ein)
+  // Pakete, deren Fragen gemeldet werden dürfen (die App trägt sie beim Öffnen ein).
+  // kurz = Code des Kurzlinks, über den die Lernenden gekommen sind (eine Klasse); sonst ''.
   const pakete = new Map();
-  LA.statistikPaket = function (p) { if (p && p.id) pakete.set(p.id, p); };
+  LA.statistikPaket = function (p, kurz = '') { if (p && p.id) pakete.set(p.id, { p, kurz: /^[a-z2-9]{7}$/.test(kurz) ? kurz : '' }); };
 
   // Kurzer Fingerabdruck (FNV-1a, 32 Bit): Frage bleibt dieselbe Zeile, auch wenn sie im Paket verschoben wird
   LA.fingerabdruck = function (text) {
@@ -50,7 +51,7 @@
   };
 
   // Die Daten, die gemeldet werden: nur Paket, Frage und Ergebnis
-  LA.statistikMeldung = function (p, karteId, richtig, wiederholung) {
+  LA.statistikMeldung = function (p, karteId, richtig, wiederholung, kurz = '') {
     const k = LA.karten(p).get(karteId);
     if (!k) return null;
     const art = karteId.split(':')[0];
@@ -63,15 +64,16 @@
       p_art: art,
       p_richtig: !!richtig,
       p_wiederholung: !!wiederholung,
+      p_kurz: kurz || '',
     };
   };
 
   LA.statistikMelden = function (paketId, karteId, richtig, wiederholung) {
     try {
       if (!LA.statistikAktiv()) return;
-      const p = pakete.get(paketId);
-      if (!p || p.quelle === 'demo') return; // Demo zählt nicht
-      const body = LA.statistikMeldung(p, karteId, richtig, wiederholung);
+      const eintrag = pakete.get(paketId);
+      if (!eintrag || eintrag.p.quelle === 'demo') return; // Demo zählt nicht
+      const body = LA.statistikMeldung(eintrag.p, karteId, richtig, wiederholung, eintrag.kurz);
       if (!body) return;
       fetch(LA.STATISTIK.url + '/rest/v1/rpc/lw_statistik_melden', {
         method: 'POST', keepalive: true,
@@ -99,14 +101,34 @@
   /* ---------- Auswertung ---------- */
   const prozent = (z) => (z.richtig + z.falsch ? z.falsch / (z.richtig + z.falsch) : 0);
 
-  LA.auswertung = function (ziel, { nurPakete, zurueck } = {}) {
+  // Zeilen derselben Frage aus verschiedenen Klassen zusammenzählen
+  LA.statistikZusammenfassen = function (zeilen) {
+    const m = new Map();
+    for (const z of zeilen) {
+      const k = z.paket_id + '\u0000' + z.karte_id;
+      const x = m.get(k);
+      if (!x) { m.set(k, { ...z, kurz: '' }); continue; }
+      x.richtig += z.richtig; x.falsch += z.falsch; x.wiederholt += z.wiederholt;
+      if (String(z.aktualisiert) > String(x.aktualisiert)) Object.assign(x, { aktualisiert: z.aktualisiert, paket_titel: z.paket_titel, frage: z.frage });
+    }
+    return [...m.values()];
+  };
+
+  LA.auswertung = function (ziel, { nurPakete, nurKurz, zurueck } = {}) {
     const status = h('p', { class: 'hinweis', 'aria-live': 'polite' }, 'Lädt …');
     const filterPaket = h('select', { 'aria-label': 'Paket wählen' });
     const suche = h('input', { type: 'text', placeholder: 'Frage suchen …', 'aria-label': 'Frage suchen' });
     const minimum = h('select', { 'aria-label': 'Mindestanzahl Antworten' },
       [1, 3, 5, 10, 20].map((n) => h('option', { value: n }, `ab ${n} Antwort${n === 1 ? '' : 'en'}`)));
+    const filterKlasse = h('select', { 'aria-label': 'Klasse wählen', hidden: true });
     const inhalt = h('div');
-    let daten = [];
+    let roh = [], daten = [], namen = new Map();
+    const klassenName = (code) => (code ? (namen.get(code) ? `${namen.get(code)} (${code})` : code) : 'ohne Kurzlink');
+    // Je nach Klassenwahl: eine Klasse allein oder alle zusammengezählt
+    const auswahlBerechnen = () => {
+      const k = filterKlasse.value;
+      daten = k === '' ? LA.statistikZusammenfassen(roh) : roh.filter((z) => z.kurz === (k === '-' ? '' : k));
+    };
 
     const zeichnen = () => {
       const gewaehlt = filterPaket.value, s = LA.norm(suche.value), min = Number(minimum.value);
@@ -143,35 +165,50 @@
     };
 
     const csv = () => {
-      const kopf = ['Paket', 'Frage', 'Art', 'richtig', 'falsch', 'Anteil falsch (%)', 'wiederholt', 'zuletzt'];
+      const kopf = ['Paket', 'Klasse', 'Frage', 'Art', 'richtig', 'falsch', 'Anteil falsch (%)', 'wiederholt', 'zuletzt'];
       const feld = (x) => `"${String(x).replace(/"/g, '""')}"`;
+      const klasse = filterKlasse.value === '' ? 'alle' : klassenName(filterKlasse.value === '-' ? '' : filterKlasse.value);
       const zeilen = daten.filter((z) => !filterPaket.value || z.paket_id === filterPaket.value)
-        .map((z) => [z.paket_titel, z.frage, ARTEN[z.art] || z.art, z.richtig, z.falsch, Math.round(prozent(z) * 100), z.wiederholt, z.aktualisiert].map(feld).join(';'));
+        .map((z) => [z.paket_titel, klasse, z.frage, ARTEN[z.art] || z.art, z.richtig, z.falsch, Math.round(prozent(z) * 100), z.wiederholt, z.aktualisiert].map(feld).join(';'));
       LA.download('lernwerkstatt-auswertung.csv', '﻿' + [kopf.map(feld).join(';'), ...zeilen].join('\r\n'), 'text/csv;charset=utf-8');
     };
 
     const laden = async () => {
       status.textContent = 'Lädt …';
       try {
-        daten = await LA.statistikLaden();
-        if (nurPakete) daten = daten.filter((z) => nurPakete.includes(z.paket_id));
-        const titel = new Map(daten.map((z) => [z.paket_id, z.paket_titel]));
+        roh = (await LA.statistikLaden()).map((z) => ({ ...z, kurz: z.kurz || '' }));
+        if (nurPakete) roh = roh.filter((z) => nurPakete.includes(z.paket_id));
+        // Klassen: Namen aus den eigenen Kurzlinks, sonst aus der Datenbank
+        const codes = [...new Set(roh.map((z) => z.kurz).filter(Boolean))];
+        if (nurKurz && !codes.includes(nurKurz)) codes.push(nurKurz);
+        namen = new Map((LA.kurzlinksAlle ? LA.kurzlinksAlle() : []).filter((e) => e.klasse).map((e) => [e.code, e.klasse]));
+        const fehlen = codes.filter((c) => !namen.has(c));
+        if (fehlen.length && LA.kurzlinksInfo) { try { (await LA.kurzlinksInfo(fehlen)).forEach((i, c) => { if (i.klasse) namen.set(c, i.klasse); }); } catch { /* nur Codes anzeigen */ } }
+        const vorherK = filterKlasse.value || nurKurz || '';
+        const ohne = roh.some((z) => !z.kurz);
+        LA.setzen(filterKlasse, h('option', { value: '' }, 'Alle Klassen zusammen'),
+          codes.sort((a, b) => klassenName(a).localeCompare(klassenName(b), 'de', { numeric: true })).map((c) => h('option', { value: c, selected: c === vorherK }, 'Klasse ' + klassenName(c))),
+          ohne && codes.length ? h('option', { value: '-', selected: vorherK === '-' }, 'Ohne Kurzlink (eigene Geräte, lange Links)') : null);
+        filterKlasse.hidden = !codes.length;
+        auswahlBerechnen();
+        const titel = new Map(roh.map((z) => [z.paket_id, z.paket_titel]));
         const vorher = filterPaket.value;
         LA.setzen(filterPaket, h('option', { value: '' }, 'Alle Pakete'), [...titel.entries()].sort((a, b) => a[1].localeCompare(b[1])).map(([id, t]) => h('option', { value: id, selected: id === vorher }, t || id)));
-        status.textContent = `${daten.reduce((n, z) => n + z.richtig + z.falsch, 0)} Antworten zu ${daten.length} Fragen. Stand: ${new Date().toLocaleString('de-CH')}`;
+        status.textContent = `${roh.reduce((n, z) => n + z.richtig + z.falsch, 0)} Antworten insgesamt. Stand: ${new Date().toLocaleString('de-CH')}`;
         zeichnen();
       } catch (e) { status.textContent = e.message + ' Ist das Gerät online?'; }
     };
 
     [filterPaket, minimum].forEach((el) => el.addEventListener('change', zeichnen));
+    filterKlasse.addEventListener('change', () => { auswahlBerechnen(); zeichnen(); });
     suche.addEventListener('input', zeichnen);
 
     LA.setzen(ziel,
       zurueck ? h('button', { class: 'zurueck', onclick: zurueck }, '← Zurück') : null,
       h('h1', null, 'Auswertung'),
       h('p', { class: 'intro' }, 'Wie oft jede Frage richtig und falsch beantwortet wurde, zusammengezählt über alle Geräte. Ohne Namen: Wer was geantwortet hat, ist nicht gespeichert. Die schwierigsten Fragen stehen oben.'),
-      h('div', { class: 'kasten' }, h('p', { class: 'hinweis' }, '«wiederholt» = so oft kam die Frage in der Wiederholung (Lernkartei) dran. Gezählt werden Lernpfad, Multiple Choice, Wahr/Falsch, Lückentext, Kreuzworträtsel, Zuordnen, Wiederholen und Flow-Training. Eigene Tests zählen mit, ausser die Statistik ist auf dem Gerät in den Einstellungen ausgeschaltet.')),
-      h('div', { class: 'aw-filter' }, filterPaket, suche, minimum,
+      h('div', { class: 'kasten' }, h('p', { class: 'hinweis' }, 'Klassen getrennt sehen: Für jede Klasse beim Teilen einen eigenen Kurzlink erstellen. «wiederholt» = so oft kam die Frage in der Wiederholung (Lernkartei) dran. Gezählt werden Lernpfad, Multiple Choice, Wahr/Falsch, Lückentext, Kreuzworträtsel, Zuordnen, Wiederholen und Flow-Training. Eigene Tests zählen mit, ausser die Statistik ist auf dem Gerät in den Einstellungen ausgeschaltet.')),
+      h('div', { class: 'aw-filter' }, filterKlasse, filterPaket, suche, minimum,
         h('button', { class: 'knopf sekundaer klein', onclick: laden }, 'Aktualisieren'),
         h('button', { class: 'knopf sekundaer klein', onclick: csv }, 'Als CSV (Excel)')),
       status, inhalt);

@@ -196,7 +196,7 @@ test('Statistik: Fingerabdruck und gemeldete Daten (ohne Personendaten)', () => 
   assert.match(LA.fingerabdruck('x'), /^[0-9a-f]{8}$/);
   const p = Object.assign(LA.paketPruefen(structuredClone(LA.DEMO)), { id: 'p1', niveau: 3, quelle: 'ki' });
   const m = LA.statistikMeldung(p, 'mc:0', false, true);
-  assert.deepEqual(Object.keys(m).sort(), ['p_art', 'p_frage', 'p_karte', 'p_paket', 'p_richtig', 'p_titel', 'p_wiederholung']);
+  assert.deepEqual(Object.keys(m).sort(), ['p_art', 'p_frage', 'p_karte', 'p_kurz', 'p_paket', 'p_richtig', 'p_titel', 'p_wiederholung']);
   assert.equal(m.p_titel, 'Der Wasserkreislauf · Niveau 3');
   assert.equal(m.p_frage, p.multiple_choice[0].frage);
   assert.match(m.p_karte, /^mc:[0-9a-f]{8}$/);
