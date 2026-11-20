@@ -174,6 +174,10 @@
       summe);
   }
 
+  // Hinweis, bevor Lernende eigenen Text an die KI schicken
+  const kiHinweis = (was) => h('p', { class: 'hinweis ki-datenschutz' }, '🔒 Keine Namen und nichts Persönliches schreiben. ' + was + ' wird an eine KI geschickt.');
+  LA.kiHinweis = kiHinweis;
+
   function nachfrageBox(kapitel, p) {
     const eingabe = h('input', { type: 'text', placeholder: 'Frage zu diesem Schritt stellen …', 'aria-label': 'Frage an die KI' });
     const antwort = h('div', { class: 'ki-antwort', 'aria-live': 'polite' });
@@ -186,7 +190,7 @@
       knopf.disabled = false;
     }
     eingabe.addEventListener('keydown', (e) => { if (e.key === 'Enter') fragen(); });
-    return h('details', { class: 'nachfrage' }, h('summary', null, 'Nicht ganz klar? Frag die KI'), h('div', { class: 'reihe' }, eingabe, knopf), antwort);
+    return h('details', { class: 'nachfrage' }, h('summary', null, 'Nicht ganz klar? Frag die KI'), h('div', { class: 'reihe' }, eingabe, knopf), kiHinweis('Deine Frage'), antwort);
   }
 
   /* ---------------- Multiple Choice ---------------- */
@@ -595,7 +599,8 @@
           }
         });
         LA.setzen(w, fortschrittsbalken(i, p.offene_fragen.length), h('div', { class: 'label' }, `Frage ${i + 1} von ${p.offene_fragen.length}`),
-          h('div', { class: 'frage mit-ton' }, h('span', null, f.frage), LA.vorleseKnopf(f.frage, 'Frage vorlesen')), feld, h('div', { class: 'reihe' }, abgeben), rueck, h('div', { class: 'reihe rechts' }, weiter));
+          h('div', { class: 'frage mit-ton' }, h('span', null, f.frage), LA.vorleseKnopf(f.frage, 'Frage vorlesen')), feld,
+          LA.kiVerfuegbar() ? kiHinweis('Deine Antwort') : null, h('div', { class: 'reihe' }, abgeben), rueck, h('div', { class: 'reihe rechts' }, weiter));
       };
       zeige();
     },
@@ -639,7 +644,7 @@
         knopf.disabled = false;
       } }, 'Korrigieren lassen');
       LA.setzen(w, h('h2', null, 'Schreiben & Korrektur'), h('div', { class: 'kasten' }, h('div', { class: 'label mit-ton' }, 'Auftrag', LA.vorleseKnopf(a.aufgabe + ' … ' + (a.hinweise || ''), 'Auftrag vorlesen')), a.aufgabe, a.hinweise ? h('p', { class: 'hinweis' }, a.hinweise) : null),
-        feld, h('div', { class: 'reihe zwischen' }, zaehler, knopf), ausgabe);
+        feld, kiHinweis('Dein Text'), h('div', { class: 'reihe zwischen' }, zaehler, knopf), ausgabe);
     },
   };
 

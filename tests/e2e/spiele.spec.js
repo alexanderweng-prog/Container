@@ -124,6 +124,7 @@ test('Wahr oder falsch, Reihenfolge, Zuordnen', async ({ page }) => {
 test('Denkfragen ohne KI: erst Kriterien und ergänzen, dann Musterantwort und Selbsteinschätzung', async ({ page }) => {
   await spielOeffnen(page, 'Denkfragen');
   await page.locator('textarea').fill('Weil Wasser verdunstet.');
+  await expect(page.locator('.ki-datenschutz')).toHaveCount(0); // ohne KI geht nichts weg
   await page.getByRole('button', { name: 'Mit den Kriterien prüfen' }).click();
   await expect(page.locator('.ki-antwort')).toContainText('Darauf kommt es an');
   await expect(page.locator('.ki-antwort .label', { hasText: 'Musterantwort' })).toHaveCount(0); // noch nicht verraten

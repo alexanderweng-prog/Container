@@ -440,3 +440,4 @@ input.luecke { width: auto; display: inline-block; min-width: 4ch; padding: 2px 
 /* Am Beamer die ganze Breite nutzen */
 .inhalt:has(> .pl-leiste) { max-width: 1400px; gap: 12px; }
 .pl-knoepfe { margin-bottom: 12px; }
+.ki-datenschutz { margin: 4px 0 8px; font-size: 13px; }

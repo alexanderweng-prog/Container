@@ -66,6 +66,7 @@ test('Textkorrektur, Denkfrage-Bewertung und Nachfrage im Lernpfad', async ({ pa
 
   // Textkorrektur: zuerst nur markiert (ohne Lösung), selbst verbessern, dann mit Lösung
   await spielOeffnen(page, 'Schreiben');
+  await expect(page.locator('.ki-datenschutz')).toContainText('Keine Namen und nichts Persönliches schreiben. Dein Text wird an eine KI geschickt.');
   await page.locator('textarea').fill('Das Wasser verdunsted im Meer und steigt dann auf.');
   await page.getByRole('button', { name: 'Korrigieren lassen' }).click();
   await expect(page.locator('.korr-text mark')).toHaveText(/verdunsted/);
@@ -82,6 +83,7 @@ test('Textkorrektur, Denkfrage-Bewertung und Nachfrage im Lernpfad', async ({ pa
 
   // Denkfrage: Hinweis ohne Musterantwort → überarbeiten → zweite Bewertung
   await spielOeffnen(page, 'Denkfragen');
+  await expect(page.locator('.ki-datenschutz')).toContainText('Deine Antwort wird an eine KI geschickt');
   await page.locator('textarea').fill('Weil Wasser verdunstet.');
   await page.getByRole('button', { name: 'Rückmeldung holen' }).click();
   await expect(page.locator('.punkte')).toContainText('2 / 3');
@@ -101,6 +103,7 @@ test('Textkorrektur, Denkfrage-Bewertung und Nachfrage im Lernpfad', async ({ pa
   await spielOeffnen(page, 'Lernpfad');
   await vorwissenUeberspringen(page);
   await page.getByText('Nicht ganz klar? Frag die KI').click();
+  await expect(page.locator('.nachfrage .ki-datenschutz')).toContainText('Deine Frage wird an eine KI geschickt');
   await page.locator('.nachfrage input').fill('Warum?');
   await page.locator('.nachfrage .knopf').click();
   await expect(page.locator('.nachfrage .ki-antwort strong')).toHaveText('Sonne');
