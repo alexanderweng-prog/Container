@@ -4,7 +4,7 @@
   const PAKETE_KEY = 'lernapp.pakete';
   const main = () => document.getElementById('inhalt');
 
-  const zustand = { paket: null, schuelerModus: false, gruppe: null, kurz: '' };
+  const zustand = { paket: null, schuelerModus: false, gruppe: null, kurz: '', runde: null };
 
   /* ---------- Niveaus: Pakete derselben Gruppe ---------- */
   function gruppeVon(p) {
@@ -47,7 +47,7 @@
   function kopf() {
     const k = document.getElementById('kopf');
     LA.setzen(k, 
-      h('button', { class: 'marke', onclick: () => (zustand.schuelerModus && zustand.paket ? LA.zurUebersicht() : startAnsicht()) }, h('span', { class: 'marke-zeichen', 'aria-hidden': 'true' }, 'L'), 'Lernwerkstatt'),
+      h('button', { class: 'marke', onclick: () => (zustand.runde ? rundeAnsicht(zustand.runde) : zustand.schuelerModus && zustand.paket ? LA.zurUebersicht() : startAnsicht()) }, h('span', { class: 'marke-zeichen', 'aria-hidden': 'true' }, 'L'), 'Lernwerkstatt'),
       h('nav', null,
         zustand.schuelerModus ? h('span', { class: 'tag' }, 'Schüleransicht') : h('button', { class: 'knopf sekundaer klein', onclick: startAnsicht }, 'Meine Pakete'),
         zustand.schuelerModus && LA.serverStatus && LA.serverStatus.serverKi && LA.serverStatus.codeNoetig
@@ -57,7 +57,7 @@
 
   /* ---------- Start: Paketliste ---------- */
   function startAnsicht() {
-    zustand.paket = null; zustand.schuelerModus = false; zustand.gruppe = null; zustand.kurz = ''; kopf();
+    zustand.paket = null; zustand.schuelerModus = false; zustand.gruppe = null; zustand.kurz = ''; zustand.runde = null; kopf();
     const liste = pakete();
     const dateiInput = h('input', { type: 'file', accept: '.json,application/json', hidden: true, onchange: async (e) => {
       try {
@@ -77,7 +77,8 @@
           h('button', { class: 'knopf sekundaer', onclick: () => paketAnsicht(LA.paketPruefen(structuredClone(LA.DEMO))) }, 'Demo ansehen (Wasserkreislauf)'),
           h('button', { class: 'knopf sekundaer', onclick: () => dateiInput.click() }, 'Paket importieren'), dateiInput,
           h('button', { class: 'knopf sekundaer', onclick: () => auswertungAnsicht() }, '📊 Auswertung'),
-          LA.kurzlinksAlle && LA.kurzlinksAlle().length ? h('button', { class: 'knopf sekundaer', onclick: kurzlinksAnsicht }, '🔗 Meine Kurzlinks') : null)),
+          LA.kurzlinksAlle && LA.kurzlinksAlle().length ? h('button', { class: 'knopf sekundaer', onclick: kurzlinksAnsicht }, '🔗 Meine Kurzlinks') : null,
+          liste.length ? h('button', { class: 'knopf sekundaer', onclick: rundeDialog }, '🔀 Wiederholungsrunde') : null)),
       h('section', null,
         h('h2', null, 'Meine Lernpakete'),
         liste.length ? h('div', { class: 'karten' }, liste.filter((p, i) => !p.gruppe || liste.findIndex((x) => x.gruppe === p.gruppe) === i).map((p0) => {
@@ -420,6 +421,56 @@
     window.scrollTo({ top: 0 });
   }
 
+  /* ---------- Wiederholungsrunde für die Klasse ---------- */
+  function rundeAnsicht(daten) {
+    LA.vorlesenStoppen();
+    zustand.runde = daten; zustand.paket = null; kopf();
+    LA.rundeStarten(main(), daten, { kurz: zustand.kurz });
+    window.scrollTo({ top: 0 });
+  }
+
+  function rundeDialog() {
+    const liste = pakete();
+    // pro Niveau-Gruppe ein Eintrag (bevorzugtes Niveau, sonst Niveau 2)
+    const eintraege = liste.filter((p, i) => !p.gruppe || liste.findIndex((x) => x.gruppe === p.gruppe) === i).map((p0) => bevorzugtesNiveau(gruppeVon(p0)));
+    const boxen = eintraege.map((p) => h('label', { class: 'schalter' }, h('input', { type: 'checkbox', value: p.id }), ' ', p.titel, p.niveau ? h('span', { class: 'hinweis' }, ' · ' + niveauText(p)) : null));
+    const anzahl = h('select', { 'aria-label': 'Anzahl Fragen' }, [10, 15, 20, 30].map((n) => h('option', { value: n, selected: n === 15 }, `${n} Fragen`)));
+    const schwierig = h('input', { type: 'checkbox', checked: true });
+    const klasse = h('input', { type: 'text', maxlength: 60, placeholder: 'z. B. 2a', 'aria-label': 'Klasse' });
+    const ergebnisFeld = h('div', { class: 'kurz-bereich' });
+    const knopf = h('button', { class: 'knopf', onclick: async () => {
+      const gewaehlt = boxen.map((b) => b.querySelector('input')).filter((i) => i.checked).map((i) => eintraege.find((p) => p.id === i.value));
+      if (!gewaehlt.length) { LA.meldung('Wähle mindestens ein Paket.', 'fehler'); return; }
+      if (!LA.kurzlinkMoeglich()) { LA.meldung('Wiederholungsrunden werden als Kurzlink geteilt. Das geht nur, wenn die App über eine Webadresse läuft.', 'fehler'); return; }
+      knopf.disabled = true; knopf.textContent = 'Wird erstellt …';
+      try {
+        let gewichte = new Map();
+        if (schwierig.checked) { try { gewichte = LA.rundeGewichte(await LA.statistikLaden()); } catch { /* ohne Auswertung: gleich gewichtet */ } }
+        const runde = LA.rundeBauen(gewaehlt, { anzahl: Number(anzahl.value), gewichte });
+        const code = await LA.kurzlinkErstellen(runde, klasse.value);
+        const url = LA.kurzlinkUrl(code);
+        LA.setzen(ergebnisFeld, h('div', { class: 'kurz-ergebnis' },
+          h('div', { class: 'qr-klein', html: LA.qrSvg(url) }),
+          h('div', { class: 'kurz-text' },
+            h('div', { class: 'label' }, `Wiederholungsrunde · ${runde.auswahl.length} Fragen` + (klasse.value.trim() ? ' · ' + klasse.value.trim() : '')),
+            h('input', { type: 'text', readonly: true, value: url, class: 'kurz-url', 'aria-label': 'Kurzlink', onclick: (e) => e.target.select() }),
+            h('div', { class: 'reihe' },
+              h('button', { class: 'knopf', onclick: async () => { try { await navigator.clipboard.writeText(url); LA.meldung('Link kopiert.'); } catch { LA.meldung('Bitte manuell kopieren (Ctrl+C).'); } } }, 'Link kopieren'),
+              h('button', { class: 'knopf sekundaer', onclick: () => LA.qrVollbild(url, 'Wiederholungsrunde' + (klasse.value.trim() ? ' · ' + klasse.value.trim() : '')) }, 'QR gross für Beamer')),
+            h('p', { class: 'hinweis' }, 'Alle bekommen dieselben Fragen in eigener Reihenfolge. Die Antworten erscheinen in der Auswertung bei den jeweiligen Paketen. Die Runde ist eine feste Auswahl: Spätere Änderungen an den Paketen kommen hier nicht an.'))));
+        knopf.textContent = 'Weitere Runde erstellen';
+      } catch (e) { LA.meldung(e.message, 'fehler'); knopf.textContent = 'Kurzlink mit QR-Code erstellen'; }
+      knopf.disabled = false;
+    } }, 'Kurzlink mit QR-Code erstellen');
+    dialog('Wiederholungsrunde für die Klasse', [
+      h('p', null, 'Gemischte Fragen aus mehreren Paketen, z. B. als 10-Minuten-Einstieg in die Lektion. Wiederholen mit zeitlichem Abstand und gemischtes Üben festigen das Gelernte.'),
+      h('fieldset', null, h('legend', null, 'Welche Pakete?'), h('div', { class: 'schalter-raster' }, boxen)),
+      h('div', { class: 'reihe' }, anzahl, h('label', { class: 'ed-feld' }, h('span', null, 'Klasse (optional)'), klasse)),
+      h('label', { class: 'schalter' }, schwierig, ' Fragen, die in der Auswertung oft falsch waren, häufiger nehmen'),
+      knopf, ergebnisFeld,
+    ]);
+  }
+
   /* ---------- Meine Kurzlinks ---------- */
   function kurzlinksAnsicht() {
     LA.vorlesenStoppen();
@@ -526,6 +577,7 @@
         const daten = await LA.kurzlinkLaden(kurzcode[1]);
         zustand.schuelerModus = true;
         zustand.kurz = kurzcode[1].toLowerCase(); // Antworten zählen für diese Klasse
+        if (LA.istRunde(daten)) { rundeAnsicht(daten); return; }
         if (Array.isArray(daten)) { zustand.gruppe = daten.map((x) => LA.paketPruefen(x)); paketAnsicht(bevorzugtesNiveau(zustand.gruppe)); }
         else paketAnsicht(LA.paketPruefen(daten));
         return;

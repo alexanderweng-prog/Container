@@ -240,3 +240,27 @@ test('Multiple Choice: Rückmeldungen pro Option bleiben beim Bereinigen richtig
   // Ohne Rückmeldungen: Feld fehlt (ältere Pakete)
   assert.equal('rueckmeldungen' in LA.paketPruefen({ multiple_choice: [{ frage: 'F?', optionen: ['A', 'B'], richtig: 0 }] }).multiple_choice[0], false);
 });
+
+test('Wiederholungsrunde: verteilt auf Pakete, abwechselnd, schwierige Fragen häufiger', () => {
+  const LA = laden('util.js', 'ki.js', 'offline.js', 'wiederholen.js', 'statistik.js', 'runde.js');
+  const a = Object.assign(LA.paketPruefen(structuredClone(LA.DEMO)), { id: 'a', titel: 'A' });
+  const b = Object.assign(LA.paketPruefen(structuredClone(LA.DEMO)), { id: 'b', titel: 'B' });
+  const r = LA.rundeBauen([a, b], { anzahl: 10 });
+  assert.equal(r.typ, 'runde'); assert.ok(LA.istRunde(r));
+  assert.equal(r.auswahl.length, 10);
+  assert.deepEqual(r.auswahl.map((x) => x.paket), ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b', 'a', 'b'], 'abwechselnd');
+  assert.equal(new Set(r.auswahl.map((x) => x.paket + x.kid)).size, 10, 'keine Frage doppelt');
+  assert.equal(r.titel, 'Wiederholung: A, B');
+  assert.deepEqual(r.pakete[0].offene_fragen, [], 'nur, was die Runde braucht');
+  // Mehr Fragen als vorhanden: alle, nicht mehr
+  const alle = LA.karten(a).size;
+  assert.equal(LA.rundeBauen([a], { anzahl: 999 }).auswahl.length, alle);
+  // Gewichtung: eine Frage mit 100 % falsch kommt fast immer vor
+  const kid = 'mc:0', fp = LA.statistikMeldung(a, kid, true, false).p_karte;
+  const gewichte = LA.rundeGewichte([{ paket_id: 'a', karte_id: fp, richtig: 0, falsch: 10, erst_richtig: 0, erst_falsch: 10 }, { paket_id: 'a', karte_id: 'x', richtig: 5, falsch: 0 }]);
+  assert.equal(gewichte.get('a|' + fp), 1);
+  const zaehlen = (g) => { let t = 0; for (let i = 0; i < 1000; i++) if (LA.rundeBauen([a], { anzahl: 3, gewichte: g }).auswahl.some((x) => x.kid === kid)) t++; return t; };
+  const mit = zaehlen(gewichte), ohne = zaehlen(new Map());
+  assert.ok(mit > ohne * 2.5, `gewichtet ${mit} vs. ungewichtet ${ohne} (von 1000)`);
+  assert.throws(() => LA.rundeBauen([]), /keine Übungsfragen/);
+});

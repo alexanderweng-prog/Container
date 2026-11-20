@@ -219,3 +219,56 @@ test('Ältere gespeicherte Kurzlinks werden übernommen', async ({ page, context
   await expect(page.locator('.kurz-url')).toHaveValue(/#p=abc2345$/);
   await expect(page.locator('.kurz-text .label')).toHaveText('Kurzlink · ohne Klassenname');
 });
+
+test('Wiederholungsrunde: aus zwei Paketen, als Kurzlink, Antworten zählen beim ursprünglichen Paket', async ({ page, context }) => {
+  const fehler = fehlerSammeln(page);
+  const { db, aufrufe } = await datenbank(context, [
+    { paket_id: 'pa', karte_id: 'x', kurz: '', paket_titel: 'A', frage: 'x', art: 'mc', richtig: 1, falsch: 1, wiederholt: 0, erst_richtig: 1, erst_falsch: 1, aktualisiert: '2026-11-20T09:00:00Z' },
+  ]);
+  await page.goto('/');
+  await page.evaluate(() => {
+    const p = (id, titel) => Object.assign(LA.paketPruefen(structuredClone(LA.DEMO)), { id, titel, quelle: 'ki' });
+    localStorage.setItem('lernapp.pakete', JSON.stringify([p('pa', 'Wasser A'), p('pb', 'Wasser B'), p('pc', 'Nicht gewählt')]));
+  });
+  await page.reload();
+  await page.getByRole('button', { name: '🔀 Wiederholungsrunde' }).click();
+  await page.getByRole('button', { name: 'Kurzlink mit QR-Code erstellen' }).click();
+  await expect(page.locator('.toast').last()).toContainText('mindestens ein Paket');
+  await page.getByLabel('Wasser A').check();
+  await page.getByLabel('Wasser B').check();
+  await page.getByRole('combobox', { name: 'Anzahl Fragen' }).selectOption('10');
+  await page.getByRole('textbox', { name: 'Klasse' }).fill('3c');
+  await page.getByRole('button', { name: 'Kurzlink mit QR-Code erstellen' }).click();
+  await expect(page.locator('.kurz-url')).toHaveValue(/#p=abc2345$/);
+  await expect(page.locator('.kurz-text .label')).toHaveText('Wiederholungsrunde · 10 Fragen · 3c');
+  const runde = db.get('abc2345').daten;
+  expect(runde.typ).toBe('runde');
+  expect(runde.pakete.map((p) => p.id)).toEqual(['pa', 'pb']);
+  expect(db.get('abc2345').klasse).toBe('3c');
+  expect(aufrufe.some((a) => a.name === 'lw_statistik_melden')).toBe(false);
+
+  // Schüler*in
+  const s = await context.newPage();
+  const sFehler = fehlerSammeln(s);
+  await s.addInitScript(() => localStorage.setItem('lernapp.statistik', JSON.stringify('an')));
+  await s.goto('/#p=abc2345');
+  await expect(s.getByRole('heading', { level: 1 })).toHaveText('Wiederholungsrunde');
+  await expect(s.locator('.intro')).toContainText('10 gemischte Fragen aus: Wasser A, Wasser B');
+  await expect(s.locator('.kopf .tag')).toHaveText('Schüleransicht');
+  await s.getByRole('button', { name: "Los geht's" }).click();
+  for (let i = 0; i < 40 && !(await s.locator('.ergebnis').count()); i++) {
+    const feld = s.locator('.spielflaeche input[type=text], main input[type=text]').first();
+    if (await feld.count()) { await feld.fill('falsch'); await s.getByRole('button', { name: 'Prüfen' }).click(); }
+    else await s.locator('button.option').first().click();
+    if (await s.locator('.sicherheit').count()) await s.locator('.sicherheit button').first().click();
+    await s.getByRole('button', { name: 'Weiter' }).click();
+  }
+  await expect(s.locator('.ergebnis-zahl')).toHaveText(/^\d+ \/ 10$/);
+  await expect(s.locator('.runde-pakete li')).toHaveCount(2);
+  const meldungen = aufrufe.filter((a) => a.name === 'lw_statistik_melden').map((a) => a.body);
+  expect(meldungen.length).toBeGreaterThanOrEqual(10);
+  expect(new Set(meldungen.map((m) => m.p_paket))).toEqual(new Set(['pa', 'pb']));
+  expect(meldungen.every((m) => m.p_kurz === 'abc2345' && m.p_wiederholung === true)).toBe(true);
+  expect(fehler).toEqual([]);
+  expect(sFehler).toEqual([]);
+});
