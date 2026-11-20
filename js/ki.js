@@ -40,6 +40,8 @@
     return k;
   }
 
+  LA.geraetKennung = geraetKennung;
+
   function client() {
     const e = LA.einstellungen();
     if (!window.Anthropic) throw new Error('Die Anthropic-Bibliothek wurde nicht geladen.');

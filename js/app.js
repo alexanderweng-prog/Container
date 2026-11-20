@@ -4,7 +4,7 @@
   const PAKETE_KEY = 'lernapp.pakete';
   const main = () => document.getElementById('inhalt');
 
-  const zustand = { paket: null, schuelerModus: false, gruppe: null, kurz: '', runde: null };
+  const zustand = { paket: null, schuelerModus: false, gruppe: null, kurz: '', runde: null, plenum: null };
 
   /* ---------- Niveaus: Pakete derselben Gruppe ---------- */
   function gruppeVon(p) {
@@ -47,7 +47,7 @@
   function kopf() {
     const k = document.getElementById('kopf');
     LA.setzen(k, 
-      h('button', { class: 'marke', onclick: () => (zustand.runde ? rundeAnsicht(zustand.runde) : zustand.schuelerModus && zustand.paket ? LA.zurUebersicht() : startAnsicht()) }, h('span', { class: 'marke-zeichen', 'aria-hidden': 'true' }, 'L'), 'Lernwerkstatt'),
+      h('button', { class: 'marke', onclick: () => (zustand.plenum ? null : zustand.runde ? rundeAnsicht(zustand.runde) : zustand.schuelerModus && zustand.paket ? LA.zurUebersicht() : startAnsicht()) }, h('span', { class: 'marke-zeichen', 'aria-hidden': 'true' }, 'L'), 'Lernwerkstatt'),
       h('nav', null,
         zustand.schuelerModus ? h('span', { class: 'tag' }, 'Schüleransicht') : h('button', { class: 'knopf sekundaer klein', onclick: startAnsicht }, 'Meine Pakete'),
         zustand.schuelerModus && LA.serverStatus && LA.serverStatus.serverKi && LA.serverStatus.codeNoetig
@@ -105,7 +105,7 @@
 
   /* ---------- Start: Paketliste ---------- */
   function startAnsicht() {
-    zustand.paket = null; zustand.schuelerModus = false; zustand.gruppe = null; zustand.kurz = ''; zustand.runde = null; kopf();
+    zustand.paket = null; zustand.schuelerModus = false; zustand.gruppe = null; zustand.kurz = ''; zustand.runde = null; zustand.plenum = null; kopf();
     const liste = pakete();
     const dateiInput = h('input', { type: 'file', accept: '.json,application/json', hidden: true, onchange: async (e) => {
       try {
@@ -299,7 +299,8 @@
             ? LA.download(dateiname(p).replace('.json', '-niveaus.json'), JSON.stringify(gruppe, null, 2))
             : LA.download(dateiname(p), JSON.stringify(p, null, 2)) }, 'Export'),
           h('button', { class: 'knopf sekundaer klein', onclick: () => bearbeitenAnsicht(p) }, 'Bearbeiten'),
-          h('button', { class: 'knopf sekundaer klein', onclick: () => auswertungAnsicht(gruppe.map((x) => x.id), () => paketAnsicht(p)) }, 'Auswertung'))),
+          h('button', { class: 'knopf sekundaer klein', onclick: () => auswertungAnsicht(gruppe.map((x) => x.id), () => paketAnsicht(p)) }, 'Auswertung'),
+          LA.plenumFragen(p).length ? h('button', { class: 'knopf sekundaer klein', onclick: () => plenumDialog(p) }, '🗳️ Plenum') : null)),
       // Fällige Wiederholungen zuerst: Abrufen vor Neuem
       ls.faellig.length ? wiederholenBereich : null,
       lernpfad ? h('section', null, h('div', { class: 'label' }, '1 · Zuerst lernen'), spielKarte('lernpfad', true)) : null,
@@ -472,6 +473,40 @@
     window.scrollTo({ top: 0 });
   }
 
+  /* ---------- Plenum (Abstimmung im Klassenzimmer) ---------- */
+  function plenumAnsicht(code) {
+    LA.vorlesenStoppen();
+    zustand.paket = null; zustand.plenum = null; zustand.schuelerModus = false; kopf();
+    try { history.replaceState(null, '', '#plenum=' + code); } catch { /* egal */ }
+    LA.plenumLehrperson(main(), code, { beenden: () => { try { history.replaceState(null, '', location.pathname + location.search); } catch { /* egal */ } startAnsicht(); } });
+    window.scrollTo({ top: 0 });
+  }
+
+  function plenumDialog(p) {
+    const fragen = LA.plenumFragen(p);
+    const boxen = fragen.map((f, i) => h('label', { class: 'schalter pl-wahl' }, h('input', { type: 'checkbox', value: i, checked: f.art === 'Multiple Choice' }), ' ', h('span', null, f.frage, h('span', { class: 'hinweis' }, ' · ' + f.art))));
+    const knopf = h('button', { class: 'knopf', onclick: async () => {
+      const auswahl = boxen.map((b) => b.querySelector('input')).filter((i) => i.checked).map((i) => fragen[Number(i.value)]);
+      if (!auswahl.length) { LA.meldung('Wähle mindestens eine Frage.', 'fehler'); return; }
+      if (!LA.kurzlinkMoeglich()) { LA.meldung('Der Plenumsmodus geht nur, wenn die App über eine Webadresse läuft.', 'fehler'); return; }
+      knopf.disabled = true; knopf.textContent = 'Wird gestartet …';
+      try {
+        const code = await LA.plenumErstellen(p.titel + (p.niveau ? ' · ' + niveauText(p) : ''), auswahl);
+        d.close();
+        plenumAnsicht(code);
+      } catch (e) { LA.meldung(e.message, 'fehler'); knopf.disabled = false; knopf.textContent = 'Plenum starten'; }
+    } }, 'Plenum starten');
+    const d = dialog('Plenum: gemeinsam abstimmen', [
+      h('p', null, 'Eine Frage nach der anderen am Beamer. Alle stimmen auf ihrem Gerät ab, die Verteilung erscheint erst nach dem Abstimmen. Bei geteilter Meinung diskutieren die Lernenden zu zweit und stimmen nochmals ab (Peer Instruction).'),
+      h('div', { class: 'reihe' },
+        h('button', { class: 'knopf sekundaer klein', type: 'button', onclick: () => boxen.forEach((b) => { b.querySelector('input').checked = true; }) }, 'Alle'),
+        h('button', { class: 'knopf sekundaer klein', type: 'button', onclick: () => boxen.forEach((b) => { b.querySelector('input').checked = false; }) }, 'Keine')),
+      h('fieldset', { class: 'pl-fragenwahl' }, h('legend', null, 'Welche Fragen?'), boxen),
+      h('p', { class: 'hinweis' }, 'Die Stimmen sind anonym und werden nach zwei Tagen gelöscht. Sie zählen nicht in der Auswertung.'),
+      knopf,
+    ]);
+  }
+
   /* ---------- Wiederholungsrunde für die Klasse ---------- */
   function rundeAnsicht(daten) {
     LA.vorlesenStoppen();
@@ -621,6 +656,10 @@
   async function init() {
     await LA.serverPruefen();
     if (location.hash === '#auswertung') return auswertungAnsicht();
+    const plenumSus = location.hash.match(/^#l=([A-Za-z2-9]{6})$/);
+    if (plenumSus) { zustand.schuelerModus = true; zustand.plenum = plenumSus[1].toLowerCase(); kopf(); return LA.plenumSchueler(main(), zustand.plenum); }
+    const plenumLp = location.hash.match(/^#plenum=([a-z2-9]{6})$/);
+    if (plenumLp && LA.plenumBekannt(plenumLp[1])) return plenumAnsicht(plenumLp[1]);
     const kurzcode = location.hash.match(/^#p=([A-Za-z2-9]{7})$/);
     if (kurzcode) {
       LA.setzen(main(), h('p', { class: 'hinweis' }, 'Lernpaket wird geladen …'));

@@ -297,3 +297,38 @@ revoke all on function public.lw_statistik_melden(text, text, text, text, text, 
 revoke all on function public.lw_antworten_laden() from public;
 grant execute on function public.lw_statistik_melden(text, text, text, text, text, boolean, boolean, text, boolean, text, text) to anon, authenticated;
 grant execute on function public.lw_antworten_laden() to anon, authenticated;
+
+-- ============================================================
+-- Plenumsmodus (Migration «lernwerkstatt_plenum»): Abstimmung im Klassenzimmer
+-- Tabellen nur über Funktionen erreichbar; Sitzungen werden nach zwei Tagen gelöscht.
+-- ============================================================
+create table if not exists public.lw_plenum (
+  code text primary key check (code ~ '^[a-z2-9]{6}$'),
+  token_hash text not null,
+  titel text not null default '' check (length(titel) <= 200),
+  fragen jsonb not null,
+  aktuell integer not null default 0,
+  runde integer not null default 1 check (runde between 1 and 2),
+  status text not null default 'warten' check (status in ('warten', 'offen', 'geschlossen', 'loesung')),
+  erstellt timestamptz not null default now(),
+  aktualisiert timestamptz not null default now()
+);
+create table if not exists public.lw_plenum_stimmen (
+  code text not null references public.lw_plenum(code) on delete cascade,
+  frage integer not null,
+  runde integer not null,
+  geraet text not null check (geraet ~ '^[A-Za-z0-9_-]{16,64}$'),
+  wahl integer not null check (wahl between 0 and 9),
+  zeit timestamptz not null default now(),
+  primary key (code, frage, runde, geraet)
+);
+alter table public.lw_plenum enable row level security;
+alter table public.lw_plenum_stimmen enable row level security;
+revoke all on public.lw_plenum, public.lw_plenum_stimmen from anon, authenticated;
+-- Funktionen: lw_plenum_erstellen(p_titel, p_fragen, p_token) → code
+--             lw_plenum_steuern(p_code, p_token, p_aktuell, p_runde, p_status) → boolean
+--             lw_plenum_zustand(p_code) → jsonb (Lösung erst bei status 'loesung')
+--             lw_plenum_abstimmen(p_code, p_geraet, p_frage, p_runde, p_wahl) → boolean (nur wenn offen)
+--             lw_plenum_ergebnis(p_code, p_token) → jsonb (Verteilung pro Runde, Teilnehmende)
+--             lw_plenum_beenden(p_code, p_token) → boolean
+-- Vollständiger Code: siehe Migration «lernwerkstatt_plenum» im Supabase-Projekt.
