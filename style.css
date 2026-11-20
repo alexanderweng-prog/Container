@@ -407,3 +407,5 @@ input.luecke { width: auto; display: inline-block; min-width: 4ch; padding: 2px 
 .vorher-info { margin-top: 6px; }
 .ergebnis-vergleich { font-weight: 700; font-size: 18px; }
 .runde-pakete { text-align: left; margin: 8px auto; max-width: 420px; }
+.sicherung-hinweis { border-color: var(--accent); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.sicherung-hinweis p { margin: 0; }

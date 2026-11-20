@@ -55,6 +55,54 @@
         zustand.schuelerModus ? null : h('button', { class: 'knopf sekundaer klein', onclick: einstellungenAnsicht, 'aria-label': 'Einstellungen' }, LA.kiVerfuegbar() ? '⚙︎ KI aktiv' : '⚙︎ Einstellungen')));
   }
 
+  /* ---------- Sicherung: alle Pakete und Kurzlinks in einer Datei ---------- */
+  const SICHERUNG_TYP = 'lernwerkstatt-sicherung';
+  const SICHERUNG_KEY = 'lernapp.letzteSicherung';
+  const heuteText = () => new Date().toISOString().slice(0, 10);
+
+  function sicherungErstellen() {
+    const daten = {
+      typ: SICHERUNG_TYP, version: 1, erstellt: new Date().toISOString(),
+      // Keine Einstellungen (API-Schlüssel, Klassencode) und kein Lernstand
+      pakete: pakete(),
+      kurzlinks: LA.kurzlinksAlle ? LA.kurzlinksAlle() : [],
+    };
+    LA.download(`lernwerkstatt-sicherung-${heuteText()}.json`, JSON.stringify(daten, null, 1));
+    LA.speicher.schreiben(SICHERUNG_KEY, new Date().toISOString());
+    LA.meldung(`${daten.pakete.length} Paket${daten.pakete.length === 1 ? '' : 'e'} gesichert. Die Datei gut aufbewahren (z. B. OneDrive), nicht weitergeben: Sie enthält die Schlüssel zum Ändern deiner Kurzlinks.`);
+  }
+
+  function sicherungEinlesen(daten) {
+    const neu = (Array.isArray(daten.pakete) ? daten.pakete : []).filter((x) => x && typeof x === 'object')
+      .map((x) => { const p = LA.paketPruefen(x); if (!p.id) p.id = LA.id(); return p; });
+    const vorhanden = new Set(pakete().map((p) => p.id));
+    const doppelt = neu.filter((p) => vorhanden.has(p.id));
+    const ersetzen = doppelt.length ? confirm(`${doppelt.length} der ${neu.length} Pakete gibt es hier schon. Durch die Fassung aus der Sicherung ersetzen?\n\nOK = ersetzen, Abbrechen = nur fehlende Pakete hinzufügen.`) : false;
+    let n = 0;
+    const liste = pakete();
+    for (const p of neu) {
+      const i = liste.findIndex((x) => x.id === p.id);
+      if (i < 0) { liste.push(p); n++; } else if (ersetzen) { liste[i] = p; n++; }
+    }
+    if (!LA.speicher.schreiben(PAKETE_KEY, liste)) { LA.meldung('Speichern im Browser nicht möglich (privater Modus?).', 'fehler'); return; }
+    const k = LA.kurzlinksUebernehmen ? LA.kurzlinksUebernehmen(daten.kurzlinks) : 0;
+    LA.meldung(`Sicherung vom ${new Date(daten.erstellt).toLocaleDateString('de-CH')} eingelesen: ${n} Paket${n === 1 ? '' : 'e'}` + (k ? `, ${k} Kurzlink${k === 1 ? '' : 's'}` : '') + '.');
+    startAnsicht();
+  }
+
+  // Erinnerung, wenn lange nicht gesichert wurde
+  function sicherungsHinweis(liste) {
+    if (!liste.length) return null;
+    const letzte = LA.speicher.lesen(SICHERUNG_KEY, null);
+    const tage = letzte ? Math.floor((Date.now() - new Date(letzte)) / 86400000) : null;
+    if (tage !== null && tage < 14) return h('p', { class: 'hinweis' }, `Letzte Sicherung: ${tage === 0 ? 'heute' : tage === 1 ? 'gestern' : `vor ${tage} Tagen`}.`);
+    return h('div', { class: 'kasten sicherung-hinweis' },
+      h('p', null, h('strong', null, 'Deine Pakete sind nur in diesem Browser gespeichert. '),
+        tage === null ? 'Du hast sie noch nie gesichert.' : `Letzte Sicherung vor ${tage} Tagen.`,
+        ' Wenn Browserdaten gelöscht werden oder du das Gerät wechselst, sind sie sonst weg.'),
+      h('button', { class: 'knopf klein', onclick: () => { sicherungErstellen(); startAnsicht(); } }, 'Jetzt sichern'));
+  }
+
   /* ---------- Start: Paketliste ---------- */
   function startAnsicht() {
     zustand.paket = null; zustand.schuelerModus = false; zustand.gruppe = null; zustand.kurz = ''; zustand.runde = null; kopf();
@@ -62,6 +110,7 @@
     const dateiInput = h('input', { type: 'file', accept: '.json,application/json', hidden: true, onchange: async (e) => {
       try {
         const daten = JSON.parse(await e.target.files[0].text());
+        if (daten && daten.typ === SICHERUNG_TYP) return sicherungEinlesen(daten);
         const liste = (Array.isArray(daten) ? daten : [daten]).map((x) => LA.paketPruefen(x));
         liste.forEach(paketSpeichern);
         LA.meldung(liste.length > 1 ? `${liste.length} Niveaus importiert.` : 'Paket importiert.');
@@ -75,12 +124,14 @@
         h('div', { class: 'reihe' },
           h('button', { class: 'knopf', onclick: erstellenAnsicht }, '+ Neues Lernpaket'),
           h('button', { class: 'knopf sekundaer', onclick: () => paketAnsicht(LA.paketPruefen(structuredClone(LA.DEMO))) }, 'Demo ansehen (Wasserkreislauf)'),
-          h('button', { class: 'knopf sekundaer', onclick: () => dateiInput.click() }, 'Paket importieren'), dateiInput,
+          h('button', { class: 'knopf sekundaer', onclick: () => dateiInput.click() }, 'Paket oder Sicherung importieren'), dateiInput,
           h('button', { class: 'knopf sekundaer', onclick: () => auswertungAnsicht() }, '📊 Auswertung'),
           LA.kurzlinksAlle && LA.kurzlinksAlle().length ? h('button', { class: 'knopf sekundaer', onclick: kurzlinksAnsicht }, '🔗 Meine Kurzlinks') : null,
           liste.length ? h('button', { class: 'knopf sekundaer', onclick: rundeDialog }, '🔀 Wiederholungsrunde') : null)),
       h('section', null,
-        h('h2', null, 'Meine Lernpakete'),
+        h('div', { class: 'reihe zwischen' }, h('h2', null, 'Meine Lernpakete'),
+          liste.length ? h('button', { class: 'knopf sekundaer klein', onclick: () => { sicherungErstellen(); startAnsicht(); } }, '💾 Alle Pakete sichern') : null),
+        sicherungsHinweis(liste),
         liste.length ? h('div', { class: 'karten' }, liste.filter((p, i) => !p.gruppe || liste.findIndex((x) => x.gruppe === p.gruppe) === i).map((p0) => {
           const gruppe = gruppeVon(p0);
           const p = bevorzugtesNiveau(gruppe);

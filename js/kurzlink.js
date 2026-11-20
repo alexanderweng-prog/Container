@@ -36,6 +36,13 @@
   }
   const schreiben = (liste) => LA.speicher.schreiben(KEY, liste);
   LA.kurzlinksAlle = alle;
+  // Aus einer Sicherung übernehmen (nach Code zusammenführen). Gibt die Anzahl neuer Einträge zurück.
+  LA.kurzlinksUebernehmen = function (liste) {
+    const jetzt = alle(), bekannt = new Set(jetzt.map((e) => e.code));
+    const neu = (Array.isArray(liste) ? liste : []).filter((e) => e && /^[a-z2-9]{7}$/.test(e.code) && typeof e.token === 'string' && !bekannt.has(e.code));
+    if (neu.length) schreiben([...jetzt, ...neu.map((e) => ({ code: e.code, token: e.token, auswahl: String(e.auswahl || ''), titel: String(e.titel || ''), klasse: String(e.klasse || ''), erstellt: e.erstellt || '' }))]);
+    return neu.length;
+  };
 
   LA.kurzlinkSchluessel = (inhalt) => (Array.isArray(inhalt) ? 'gruppe:' + inhalt[0].gruppe : 'paket:' + inhalt.id);
   // Alle Kurzlinks einer Auswahl, neueste zuerst

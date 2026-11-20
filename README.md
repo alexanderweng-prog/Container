@@ -122,7 +122,7 @@ Eine Bewertung oder Textkorrektur kostet einen Bruchteil davon. Die echten Koste
 - **API-Schlüssel ohne Server**: Wenn du die App als Datei öffnest, liegt der Schlüssel im Browser (localStorage) und lässt sich dort auslesen. Trag ihn deshalb nur auf dem eigenen Gerät ein. Für die Klasse ist der Docker-Container gedacht (siehe oben). Ohne KI funktionieren alle Spiele; Denkfragen zeigen dann eine Musterantwort zur Selbsteinschätzung, die Textkorrektur ist deaktiviert.
 - **Klassencode** ist ein einfacher Schutz gegen Fremdnutzung, keine echte Anmeldung. Wer ihn kennt, kann die KI nutzen, bis das Stundenlimit erreicht ist. Bei Missbrauch: Code ändern und den Container neu starten.
 - **Datenschutz**: Mit KI werden Material und Schülertexte an Anthropic (USA) gesendet. Keine Namen oder anderen Personendaten eingeben und die Vorgaben deiner Schule bzw. des Kantons prüfen.
-- **Speicher**: Pakete und Fortschritt liegen nur im jeweiligen Browser (die Auswertung zählt zusätzlich anonym, siehe oben). Browserdaten löschen = weg. Wichtige Pakete exportieren.
+- **Speicher**: Pakete und Fortschritt liegen nur im jeweiligen Browser (die Auswertung zählt zusätzlich anonym, siehe oben). Browserdaten löschen = weg. Darum regelmässig **«💾 Alle Pakete sichern»** (Startseite): Eine Datei mit allen Paketen und deinen Kurzlinks, ohne API-Schlüssel und Klassencode. Auf einem anderen Gerät über «Paket oder Sicherung importieren» einlesen. Die Datei enthält die Schlüssel zum Ändern deiner Kurzlinks, darum nicht weitergeben. Die Startseite erinnert, wenn die letzte Sicherung über 14 Tage her ist.
 - **Word-Dateien** (.docx) werden nicht gelesen → als PDF speichern.
 - Die KI kann Fehler machen. Pakete vor dem Einsatz durchsehen.
 
