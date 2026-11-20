@@ -25,7 +25,7 @@ test.before(async () => {
   await new Promise((ok) => upstream.listen(0, ok));
   const port = await freierPort();
   server = spawn(process.execPath, [path.join(__dirname, '..', '..', 'server', 'server.js')], {
-    env: { ...process.env, PORT: String(port), ANTHROPIC_API_KEY: ECHTER_KEY, KLASSEN_CODE: 'wasser7b', LIMIT_PRO_STUNDE: '3',
+    env: { ...process.env, PORT: String(port), ANTHROPIC_API_KEY: ECHTER_KEY, KLASSEN_CODE: 'wasser7b', LIMIT_PRO_STUNDE: '3', LIMIT_PRO_IP_STUNDE: '8',
       ANTHROPIC_BASE_URL: `http://127.0.0.1:${upstream.address().port}`, MODELLE: 'claude-haiku-5-5,claude-opus-5-5' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -88,7 +88,23 @@ test('Stundenlimit pro Gerät', async () => {
   assert.deepEqual(codes, [200, 429, 429]);
   const r = await ki({ model: 'claude-haiku-5-5', max_tokens: 10, messages: [] }, { 'x-klassen-code': 'wasser7b' });
   assert.match((await r.json()).error.message, /Stundenlimit/);
+  assert.equal(r.headers.get('x-should-retry'), 'false', 'Die App soll gesperrte Anfragen nicht wiederholen');
   // Ohne Proxy-Modus darf ein selbst gesetzter X-Forwarded-For-Header das Limit nicht umgehen
   const gefaelscht = await ki({ model: 'claude-haiku-5-5', max_tokens: 10, messages: [] }, { 'x-klassen-code': 'wasser7b', 'x-forwarded-for': '10.9.9.9' });
   assert.equal(gefaelscht.status, 429);
+});
+
+test('Limit pro Gerät statt pro IP: eine Klasse im selben Netz blockiert sich nicht gegenseitig', async () => {
+  const mit = (geraet) => ki({ model: 'claude-haiku-5-5', max_tokens: 10, messages: [] }, { 'x-klassen-code': 'wasser7b', 'x-geraet': geraet });
+  const reihe = async (geraet, n) => { const c = []; for (let i = 0; i < n; i++) c.push((await mit(geraet)).status); return c; };
+  const A = 'geraet-A-aaaaaaaaaaaaaa', B = 'geraet-B-bbbbbbbbbbbbbb', C = 'geraet-C-cccccccccccccc';
+  // Die IP ohne Kennung ist schon gesperrt (Test davor), Geräte mit Kennung haben ihr eigenes Limit
+  assert.deepEqual(await reihe(A, 4), [200, 200, 200, 429]);
+  assert.match((await (await mit(A)).json()).error.message, /auf diesem Gerät/);
+  assert.deepEqual(await reihe(B, 3), [200, 200, 200]);
+  // Obergrenze fürs ganze Netz: 8 pro Stunde (6 schon verbraucht)
+  assert.deepEqual(await reihe(C, 3), [200, 200, 429]);
+  assert.match((await (await mit(C)).json()).error.message, /in diesem Netz/);
+  // Ungültige Kennung zählt wie keine Kennung (IP als Gerät)
+  assert.equal((await mit('kurz')).status, 429);
 });

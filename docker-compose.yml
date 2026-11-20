@@ -12,4 +12,5 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       KLASSEN_CODE: ${KLASSEN_CODE:-}
       LIMIT_PRO_STUNDE: ${LIMIT_PRO_STUNDE:-60}
+      LIMIT_PRO_IP_STUNDE: ${LIMIT_PRO_IP_STUNDE:-1500}
       MODELLE: ${MODELLE:-claude-opus-5-5,claude-sonnet-5-5,claude-haiku-5-5}

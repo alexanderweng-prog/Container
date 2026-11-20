@@ -28,6 +28,18 @@
   LA.aktuellesModell = () => modellWaehlen();
   LA.kiVerfuegbar = () => !!LA.einstellungen().apiKey || (serverModus() && (!LA.serverStatus.codeNoetig || !!LA.einstellungen().klassenCode));
 
+  // Zufällige Kennung dieses Browsers, nur für das Stundenlimit auf dem Server (kein Name, nichts Persönliches).
+  // So teilt sich eine Klasse im Schulnetz nicht ein gemeinsames Limit.
+  let fluechtig = '';
+  function geraetKennung() {
+    let k = LA.speicher.lesen('lernapp.geraet', '');
+    if (/^[A-Za-z0-9_-]{16,64}$/.test(k)) return k;
+    const b = new Uint8Array(18); crypto.getRandomValues(b);
+    k = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    if (!LA.speicher.schreiben('lernapp.geraet', k)) { fluechtig = fluechtig || k; return fluechtig; }
+    return k;
+  }
+
   function client() {
     const e = LA.einstellungen();
     if (!window.Anthropic) throw new Error('Die Anthropic-Bibliothek wurde nicht geladen.');
@@ -39,7 +51,7 @@
       // Der Server ersetzt den Platzhalter durch den echten Schlüssel.
       return new window.Anthropic({
         apiKey: 'schluessel-liegt-auf-dem-server', baseURL: new URL('api/anthropic', location.href).href.replace(/\/$/, ''),
-        defaultHeaders: { 'x-klassen-code': e.klassenCode || '' }, dangerouslyAllowBrowser: true, maxRetries: 2,
+        defaultHeaders: { 'x-klassen-code': e.klassenCode || '', 'x-geraet': geraetKennung() }, dangerouslyAllowBrowser: true, maxRetries: 2,
       });
     }
     throw new Error('Keine KI verfügbar: Schlüssel in den Einstellungen hinterlegen oder die App über den Lernwerkstatt-Server öffnen.');

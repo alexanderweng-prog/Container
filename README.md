@@ -141,7 +141,8 @@ Läuft auf allem, was Docker kann: eigener PC, NAS (Synology, QNAP), Raspberry P
 |---|---|
 | `ANTHROPIC_API_KEY` | Dein Schlüssel. Steht nur in `.env` auf dem Server (die Datei ist von Git ausgeschlossen). |
 | `KLASSEN_CODE` | Code, den die Lernenden einmal eingeben (oben rechts, «🔑 Klassencode»). Leer = jede Person mit der Adresse kann die KI auf deine Kosten nutzen. |
-| `LIMIT_PRO_STUNDE` | KI-Anfragen pro Gerät (IP-Adresse) und Stunde, Standard 60. Achtung: Im Schulnetz teilen sich oft alle Geräte eine IP. Dann für die ganze Klasse grosszügig setzen, z. B. 600. |
+| `LIMIT_PRO_STUNDE` | KI-Anfragen pro Gerät und Stunde, Standard 60. Gezählt wird über eine zufällige Kennung des Browsers (kein Name), nicht über die IP-Adresse: Im Schulnetz teilen sich oft alle Geräte eine IP. |
+| `LIMIT_PRO_IP_STUNDE` | Obergrenze pro IP-Adresse (ganzes Netz, z. B. Schulhaus) und Stunde, Standard 1500. Schutz, falls jemand die Gerätekennung fälscht. Gegen hohe Kosten zusätzlich in der Anthropic Console ein monatliches Ausgabenlimit setzen. |
 | `MODELLE` | Freigegebene Modelle. Das erste ist der Standard, also nimmt man am besten das günstigste zuerst. Die Lehrperson kann in den Einstellungen ein anderes freigegebenes Modell wählen. |
 
 Was der Server erzwingt: nur `/v1/messages`, nur freigegebene Modelle, höchstens 32 000 Ausgabe-Tokens pro Anfrage, Klassencode und Stundenlimit. Der Server-Code selbst wird nicht ausgeliefert.
@@ -169,7 +170,7 @@ Vercel liefert die App aus und führt die kleine Weiterleitung als Server-Funkti
 2. Unter **Settings → Environment Variables** eintragen:
    - `ANTHROPIC_API_KEY`: ein eigener Schlüssel nur für diese App (als «Sensitive» markieren)
    - `KLASSEN_CODE`: Pflicht. Ohne Code schaltet die App die KI auf Vercel ab, weil die Adresse öffentlich ist.
-   - optional `MODELLE` (z. B. `claude-haiku-5-5,claude-opus-5-5`, das erste ist der Standard) und `LIMIT_PRO_STUNDE`
+   - optional `MODELLE` (z. B. `claude-haiku-5-5,claude-opus-5-5`, das erste ist der Standard) `LIMIT_PRO_STUNDE` und `LIMIT_PRO_IP_STUNDE`
 3. Danach einmal neu veröffentlichen (Deployments → «Redeploy»), damit die Variablen gelten.
 
 Jeder Push auf `main` aktualisiert die Seite automatisch. Pushes auf andere Branches erzeugen Vorschau-Adressen.
