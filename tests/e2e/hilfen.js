@@ -40,4 +40,7 @@ const zurueck = (page) => page.locator('.zurueck').click();
 // Antwort auf «Wie sicher bist du?» (erscheint vor dem Auflösen)
 const sicher = (page, wert = 'Sicher') => page.locator('.sicherheit').getByRole('button', { name: wert, exact: true }).click();
 
-module.exports = { fehlerSammeln, kiAttrappe, demoOeffnen, spielOeffnen, zurueck, sicher };
+// Vor dem ersten Lernpfad erscheint «Was weisst du schon?»
+const vorwissenUeberspringen = (page) => page.getByRole('button', { name: 'Überspringen' }).click();
+
+module.exports = { fehlerSammeln, kiAttrappe, demoOeffnen, spielOeffnen, zurueck, sicher, vorwissenUeberspringen };

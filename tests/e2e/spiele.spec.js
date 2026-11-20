@@ -1,6 +1,6 @@
 // Alle Spiele im Demo-Paket: öffnen, spielen, auswerten
 const { test, expect } = require('@playwright/test');
-const { fehlerSammeln, demoOeffnen, spielOeffnen, zurueck, sicher } = require('./hilfen');
+const { fehlerSammeln, demoOeffnen, spielOeffnen, zurueck, sicher, vorwissenUeberspringen } = require('./hilfen');
 
 let fehler;
 test.beforeEach(async ({ page }) => { fehler = fehlerSammeln(page); await demoOeffnen(page); });
@@ -14,8 +14,18 @@ test('Übersicht zeigt Lernpfad und alle passenden Spiele', async ({ page }) => 
   await expect(page.locator('.spiel', { hasText: 'Schreiben' })).toContainText('braucht KI-Schlüssel');
 });
 
-test('Lernpfad: Weiter erst nach der Verständnisfrage, kein «null» im Text', async ({ page }) => {
+test('Lernpfad mit Vorwissen: drei Fragen vorher, Weiter erst nach der Verständnisfrage, Vorher – nachher', async ({ page }) => {
   await spielOeffnen(page, 'Lernpfad');
+  // Vorwissen: ohne Auflösung, «Los geht's» erst wenn alle beantwortet
+  await expect(page.locator('.spielflaeche h2')).toHaveText('Was weisst du schon?');
+  await expect(page.locator('.vorwissen-frage')).toHaveCount(3);
+  const los = page.getByRole('button', { name: "Los geht's" });
+  for (let n = 0; n < 3; n++) {
+    await expect(los).toBeDisabled();
+    await page.locator('.vorwissen-frage').nth(n).getByRole('button', { name: 'Weiss ich (noch) nicht' }).click();
+  }
+  await expect(page.locator('.option.richtig, .option.falsch')).toHaveCount(0); // nichts aufgelöst
+  await los.click();
   for (let schritt = 1; schritt <= 3; schritt++) {
     await expect(page.locator('.label').first()).toHaveText(`Schritt ${schritt} von 3`);
     await expect(page.locator('.spielflaeche')).not.toContainText('null');
@@ -26,6 +36,21 @@ test('Lernpfad: Weiter erst nach der Verständnisfrage, kein «null» im Text', 
     await weiter.click();
   }
   await expect(page.locator('.ergebnis')).toContainText('Lernpfad abgeschlossen');
+  // Vorher – nachher: dieselben drei Fragen, jetzt mit Auflösung
+  const vn = page.locator('.vorher-nachher');
+  await expect(vn.locator('.mc')).toHaveCount(3);
+  const richtig = await page.evaluate(() => [...document.querySelectorAll('.vorher-nachher .mc .frage span')].map((el) => { const q = LA.DEMO.multiple_choice.find((x) => x.frage === el.textContent); return q.optionen[q.richtig]; }));
+  for (let n = 0; n < 3; n++) {
+    const karte = vn.locator('.kasten').nth(n);
+    await karte.locator('.option', { hasText: richtig[n] }).first().click();
+    await karte.locator('.sicherheit').getByRole('button', { name: 'Sicher', exact: true }).click();
+    await expect(karte.locator('.vorher-info')).toHaveText('Vor dem Lernpfad: Weiss ich (noch) nicht');
+  }
+  await expect(vn.locator('.ergebnis-vergleich')).toContainText('Vorher 0 von 3 richtig, jetzt 3 von 3.');
+  // Beim zweiten Mal keine Vorwissen-Fragen mehr
+  await zurueck(page);
+  await spielOeffnen(page, 'Lernpfad');
+  await expect(page.locator('.label').first()).toHaveText('Schritt 1 von 3');
 });
 
 test('Multiple Choice: Rückmeldung und Punktzahl', async ({ page }) => {
@@ -111,6 +136,7 @@ test('Denkfragen ohne KI: erst Kriterien und ergänzen, dann Musterantwort und S
 
 test('Vorlese-Knöpfe sind vorhanden', async ({ page }) => {
   await spielOeffnen(page, 'Lernpfad');
+  await vorwissenUeberspringen(page);
   await expect(page.locator('.vorlesen')).toHaveCount(2);
 });
 

@@ -75,9 +75,19 @@
     name: 'Lernpfad', symbol: '📖', info: 'Schritt für Schritt erklärt, mit Verständnisfrage.',
     moeglich: (p) => p.kapitel.length > 0,
     start(w, p, fertig) {
+      // Beim ersten Mal: Vorwissen aktivieren (3 Fragen ohne Bewertung)
+      const vw = LA.speicher.lesen(vorwissenKey(p.id), null);
+      const fragen = vorwissenFragen(p);
+      if (!p.vorwissen_aus && !vw && fragen.length) return vorwissenAnsicht(w, p, fragen, () => SPIELE.lernpfad.start(w, p, fertig));
       let i = 0, punkte = 0;
       const zeige = () => {
-        if (i >= p.kapitel.length) { fertig(punkte, p.kapitel.length); return ergebnis(w, punkte, p.kapitel.length, () => { i = 0; punkte = 0; zeige(); }, 'Lernpfad abgeschlossen. Jetzt kannst du mit den Übungen weitermachen.'); }
+        if (i >= p.kapitel.length) {
+          fertig(punkte, p.kapitel.length);
+          ergebnis(w, punkte, p.kapitel.length, () => { i = 0; punkte = 0; zeige(); }, 'Lernpfad abgeschlossen. Jetzt kannst du mit den Übungen weitermachen.');
+          const stand = LA.speicher.lesen(vorwissenKey(p.id), null);
+          if (stand && stand.status === 'vorher') w.append(vorherNachher(p, stand));
+          return;
+        }
         const k = p.kapitel[i];
         const weiter = h('button', { class: 'knopf', disabled: true, onclick: () => { i++; zeige(); window.scrollTo({ top: 0 }); } }, i + 1 < p.kapitel.length ? 'Weiter' : 'Abschliessen');
         const nachfrage = LA.kiVerfuegbar() ? nachfrageBox(k, p) : null;
@@ -96,6 +106,73 @@
       zeige();
     },
   };
+
+  /* ---------- Vorwissen aktivieren ----------
+     Vor dem ersten Lernpfad drei Fragen ohne Bewertung (Raten ist erwünscht: Schon der Versuch macht das spätere
+     Lernen wirksamer). Am Ende dieselben Fragen nochmals, mit Vergleich vorher – nachher. */
+  const vorwissenKey = (id) => 'lernapp.vorwissen.' + id;
+  function vorwissenFragen(p) {
+    if (p.multiple_choice.length < 3) return [];
+    // eine leichte, eine mittlere, eine schwere Frage
+    const s = p.multiple_choice.map((q, i) => ({ q, i })).sort((a, b) => (a.q.schwierigkeit || 3) - (b.q.schwierigkeit || 3) || a.i - b.i);
+    return [s[0], s[Math.floor(s.length / 2)], s[s.length - 1]].map((x) => x.i);
+  }
+  LA.vorwissenFragen = vorwissenFragen;
+
+  function vorwissenAnsicht(w, p, fragen, weiter) {
+    const wahl = new Map();
+    const los = h('button', { class: 'knopf', disabled: true, onclick: () => {
+      LA.speicher.schreiben(vorwissenKey(p.id), { status: 'vorher', fragen, vorher: fragen.map((_, n) => wahl.get(n)) });
+      weiter(); window.scrollTo({ top: 0 });
+    } }, 'Los geht\'s');
+    const block = (mcIndex, n) => {
+      const q = p.multiple_choice[mcIndex];
+      const knoepfe = [...LA.mischen(q.optionen.map((_, i) => i)), -1].map((i) => {
+        const b = h('button', { class: 'option' + (i < 0 ? ' weiss-nicht' : ''), 'aria-pressed': 'false', onclick: () => {
+          knoepfe.forEach((x) => { x.classList.remove('gewaehlt'); x.setAttribute('aria-pressed', 'false'); });
+          b.classList.add('gewaehlt'); b.setAttribute('aria-pressed', 'true');
+          wahl.set(n, i); los.disabled = wahl.size < fragen.length;
+        } }, i < 0 ? 'Weiss ich (noch) nicht' : q.optionen[i]);
+        return b;
+      });
+      return h('div', { class: 'kasten vorwissen-frage' }, h('div', { class: 'label' }, `Frage ${n + 1} von ${fragen.length}`),
+        h('div', { class: 'frage mit-ton' }, h('span', null, q.frage), LA.vorleseKnopf(q.frage, 'Frage vorlesen')), h('div', { class: 'optionen' }, knoepfe));
+    };
+    LA.setzen(w,
+      h('h2', null, 'Was weisst du schon?'),
+      h('p', { class: 'intro' }, 'Bevor es losgeht: Beantworte drei Fragen, so gut du kannst. Raten ist ausdrücklich erlaubt, es zählt nicht. Am Ende des Lernpfads kommen dieselben Fragen nochmals, dann siehst du, was du dazugelernt hast.'),
+      fragen.map(block),
+      h('div', { class: 'reihe zwischen' },
+        h('button', { class: 'knopf sekundaer', onclick: () => { LA.speicher.schreiben(vorwissenKey(p.id), { status: 'uebersprungen' }); weiter(); } }, 'Überspringen'),
+        los));
+  }
+
+  function vorherNachher(p, stand) {
+    const fragen = stand.fragen.filter((i) => p.multiple_choice[i]);
+    let fertigAnzahl = 0, jetzt = 0;
+    const vorherRichtig = fragen.filter((i, n) => stand.vorher[stand.fragen.indexOf(i)] === p.multiple_choice[i].richtig).length;
+    const summe = h('div', { 'aria-live': 'polite' });
+    return h('section', { class: 'vorher-nachher' },
+      h('h2', null, 'Vorher – nachher'),
+      h('p', { class: 'hinweis' }, 'Diese Fragen hast du vor dem Lernpfad beantwortet. Wie ist es jetzt?'),
+      fragen.map((i) => {
+        const q = p.multiple_choice[i];
+        const vorher = stand.vorher[stand.fragen.indexOf(i)];
+        const info = h('div', { class: 'hinweis vorher-info' });
+        return h('div', { class: 'kasten' }, mcKarte(q, (ok, extra) => {
+          LA.melden(p.id, 'mc:' + i, ok, extra);
+          if (ok) jetzt++;
+          const vorherText = vorher == null || vorher < 0 ? 'Weiss ich (noch) nicht' : `«${q.optionen[vorher]}»`;
+          info.textContent = `Vor dem Lernpfad: ${vorherText}${vorher === q.richtig ? ' (richtig)' : vorher >= 0 ? ' (falsch)' : ''}`;
+          if (++fertigAnzahl === fragen.length) {
+            LA.speicher.schreiben(vorwissenKey(p.id), { ...stand, status: 'fertig', nachher: jetzt });
+            LA.setzen(summe, h('div', { class: 'ergebnis-vergleich' }, `Vorher ${vorherRichtig} von ${fragen.length} richtig, jetzt ${jetzt} von ${fragen.length}.`,
+              jetzt > vorherRichtig ? ' Das hast du dazugelernt.' : jetzt === fragen.length ? ' Stark.' : ' Schau dir die Erklärungen nochmals an.'));
+          }
+        }, { sicherheit: LA.sicherheitAktiv(p) }), info);
+      }),
+      summe);
+  }
 
   function nachfrageBox(kapitel, p) {
     const eingabe = h('input', { type: 'text', placeholder: 'Frage zu diesem Schritt stellen …', 'aria-label': 'Frage an die KI' });

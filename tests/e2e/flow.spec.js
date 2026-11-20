@@ -1,6 +1,6 @@
 // Flow-Training im Browser
 const { test, expect } = require('@playwright/test');
-const { fehlerSammeln, demoOeffnen, sicher } = require('./hilfen');
+const { fehlerSammeln, demoOeffnen, sicher, vorwissenUeberspringen } = require('./hilfen');
 
 let fehler;
 test.beforeEach(({ page }) => { fehler = fehlerSammeln(page); });
@@ -63,6 +63,7 @@ test('Sehr schwache Runde: Hinweis auf den Lernpfad', async ({ page }) => {
   for (let i = 0; i < 12; i++) await beantworten(page, false);
   await expect(page.locator('.ergebnis')).toContainText('Lernpfad');
   await page.getByRole('button', { name: 'Zum Lernpfad' }).click();
+  await vorwissenUeberspringen(page);
   await expect(page.locator('.spielflaeche h2')).toBeVisible();
   await expect(page.locator('.label').first()).toHaveText('Schritt 1 von 3');
 });

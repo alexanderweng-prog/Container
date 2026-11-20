@@ -401,3 +401,8 @@ input.luecke { width: auto; display: inline-block; min-width: 4ch; padding: 2px 
 .ueberarbeiten { margin-top: 8px; }
 .ed-option-block { display: flex; flex-direction: column; gap: 4px; }
 .ed-warum { margin-left: 28px; font-size: 13px; }
+.vorwissen-frage { margin-bottom: 12px; }
+.option.weiss-nicht { color: var(--muted); font-style: italic; }
+.vorher-nachher { margin-top: 24px; display: flex; flex-direction: column; gap: 12px; }
+.vorher-info { margin-top: 6px; }
+.ergebnis-vergleich { font-weight: 700; font-size: 18px; }

@@ -207,12 +207,14 @@
 
     const auswahl = LA.SPIELTYPEN.map((s) => h('label', { class: 'schalter' }, h('input', { type: 'checkbox', value: s, checked: kopie.spiele.includes(s) }), ` ${LA.SPIELE[s].symbol} ${LA.SPIELE[s].name}`));
     const sicherheit = h('input', { type: 'checkbox', checked: !kopie.sicherheit_aus });
+    const vorwissen = h('input', { type: 'checkbox', checked: !kopie.vorwissen_aus });
     const json = h('textarea', { rows: 16, class: 'mono', spellcheck: 'false' });
     const status = h('div', { 'aria-live': 'polite' });
 
     const fertigMachen = () => {
       kopie.spiele = auswahl.map((l) => l.querySelector('input')).filter((i) => i.checked).map((i) => i.value);
       if (sicherheit.checked) delete kopie.sicherheit_aus; else kopie.sicherheit_aus = true;
+      if (vorwissen.checked) delete kopie.vorwissen_aus; else kopie.vorwissen_aus = true;
       const zuordnung = karteiZuordnung(p, kopie);
       const sauber = LA.paketPruefen(markierungenEntfernen(structuredClone(kopie)));
       // Unvollständige Einträge fallen bei der Prüfung weg: vorher fragen
@@ -231,7 +233,8 @@
         h('div', { class: 'zwei' }, feld(kopie, 'titel', 'Titel'), feld(kopie, 'fach', 'Fach')),
         feld(kopie, 'kurzbeschreibung', 'Kurzbeschreibung', { breit: true }),
         h('fieldset', null, h('legend', null, 'Welche Spiele sollen erscheinen?'), h('div', { class: 'schalter-raster' }, auswahl),
-          h('label', { class: 'schalter' }, sicherheit, ' Vor dem Auflösen fragen: «Wie sicher bist du?» (Multiple Choice, Wahr/Falsch, Wiederholen, Flow-Training)')),
+          h('label', { class: 'schalter' }, sicherheit, ' Vor dem Auflösen fragen: «Wie sicher bist du?» (Multiple Choice, Wahr/Falsch, Wiederholen, Flow-Training)'),
+          h('label', { class: 'schalter' }, vorwissen, ' Vorwissen aktivieren: vor dem ersten Lernpfad drei Fragen ohne Bewertung, am Ende «Vorher – nachher»')),
         h('p', { class: 'hinweis' }, 'Bereiche aufklappen zum Bearbeiten. ' + (LA.kiVerfuegbar() ? 'Mit ✨ erzeugt die KI ein einzelnes Element neu. ' : '') + 'Gelöschte oder neu erzeugte Fragen verlieren ihren Lernstand in der Lernkartei.'),
         BEREICHE.map(bereich), schreib,
         h('div', { class: 'reihe' },

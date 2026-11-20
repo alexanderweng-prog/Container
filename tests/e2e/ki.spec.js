@@ -1,6 +1,6 @@
 // KI-Funktionen mit simulierter Anthropic-API
 const { test, expect } = require('@playwright/test');
-const { fehlerSammeln, kiAttrappe, spielOeffnen, zurueck } = require('./hilfen');
+const { fehlerSammeln, kiAttrappe, spielOeffnen, zurueck, vorwissenUeberspringen } = require('./hilfen');
 
 let fehler;
 test.beforeEach(async ({ page }) => {
@@ -99,6 +99,7 @@ test('Textkorrektur, Denkfrage-Bewertung und Nachfrage im Lernpfad', async ({ pa
   await zurueck(page);
 
   await spielOeffnen(page, 'Lernpfad');
+  await vorwissenUeberspringen(page);
   await page.getByText('Nicht ganz klar? Frag die KI').click();
   await page.locator('.nachfrage input').fill('Warum?');
   await page.locator('.nachfrage .knopf').click();
