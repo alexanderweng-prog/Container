@@ -15,7 +15,27 @@
   }
 
   /* ---------------- Multiple-Choice-Frage (auch im Lernpfad verwendet) ---------------- */
-  function mcKarte(frage, beiAntwort) {
+  /* ---------- Sicherheit: vor dem Auflösen «Wie sicher bist du?» ----------
+     Sichere Fehler prägen sich bei der Korrektur besonders gut ein; geratene Treffer gelten nicht als gelernt. */
+  const SICHERHEIT = [['sicher', 'Sicher'], ['unsicher', 'Unsicher'], ['geraten', 'Geraten']];
+  LA.sicherheitAktiv = (p) => !!p && !p.sicherheit_aus;
+  // Fragt (falls aktiv) im Rückmeldefeld nach der Sicherheit und ruft dann aufloesen(sicherheit) auf
+  LA.sicherheitDann = function (aktiv, rueck, aufloesen) {
+    if (!aktiv) return aufloesen('');
+    rueck.className = 'rueckmeldung';
+    const knoepfe = SICHERHEIT.map(([wert, text]) => h('button', { class: 'knopf sekundaer klein', onclick: () => aufloesen(wert) }, text));
+    LA.setzen(rueck, h('div', { class: 'sicherheit', role: 'group', 'aria-label': 'Wie sicher bist du?' }, h('span', { class: 'sicherheit-frage' }, 'Wie sicher bist du?'), knoepfe));
+    knoepfe[0].focus();
+  };
+  // Zusatzsatz zur Rückmeldung
+  LA.sicherheitHinweis = function (richtig, sicherheit) {
+    if (!richtig && sicherheit === 'sicher') return h('div', { class: 'sicherheit-hinweis' }, 'Du warst dir sicher. Schau dir genau an, warum es anders ist: Solche Stellen merkst du dir jetzt besonders gut.');
+    if (richtig && (sicherheit === 'unsicher' || sicherheit === 'geraten')) return h('div', { class: 'sicherheit-hinweis' }, 'Richtig, aber noch nicht sicher. Die Frage kommt in der Wiederholung bald nochmals.');
+    return null;
+  };
+
+  // beiAntwort(richtig, { antwort, sicherheit })
+  function mcKarte(frage, beiAntwort, { sicherheit = false } = {}) {
     const reihenfolge = LA.mischen(frage.optionen.map((_, i) => i));
     const knoepfe = [];
     const rueck = h('div', { class: 'rueckmeldung', 'aria-live': 'polite' });
@@ -28,12 +48,17 @@
     let fertig = false;
     function waehle(i, k) {
       if (fertig) return; fertig = true;
-      const richtig = i === frage.richtig;
-      for (const [j, kn] of knoepfe) { kn.disabled = true; if (j === frage.richtig) kn.classList.add('richtig'); }
-      if (!richtig) k.classList.add('falsch');
-      rueck.className = 'rueckmeldung ' + (richtig ? 'ok' : 'nein');
-      LA.setzen(rueck, h('strong', null, richtig ? 'Richtig. ' : 'Leider falsch. '), frage.erklaerung || '');
-      beiAntwort(richtig);
+      for (const [, kn] of knoepfe) kn.disabled = true;
+      k.classList.add('gewaehlt');
+      LA.sicherheitDann(sicherheit, rueck, (wert) => {
+        const richtig = i === frage.richtig;
+        k.classList.remove('gewaehlt');
+        for (const [j, kn] of knoepfe) if (j === frage.richtig) kn.classList.add('richtig');
+        if (!richtig) k.classList.add('falsch');
+        rueck.className = 'rueckmeldung ' + (richtig ? 'ok' : 'nein');
+        LA.setzen(rueck, h('strong', null, richtig ? 'Richtig. ' : 'Leider falsch. '), frage.erklaerung || '', LA.sicherheitHinweis(richtig, wert));
+        beiAntwort(richtig, { antwort: richtig ? '' : frage.optionen[i], sicherheit: wert });
+      });
     }
     return box;
   }
@@ -60,7 +85,7 @@
           k.beispiel ? h('div', { class: 'kasten beispiel' }, h('div', { class: 'label' }, 'Beispiel'), k.beispiel) : null,
           k.merksatz ? h('div', { class: 'kasten merksatz' }, h('div', { class: 'label' }, 'Merksatz'), k.merksatz) : null,
           nachfrage,
-          k.check && k.check.optionen ? h('div', { class: 'kasten' }, h('div', { class: 'label' }, 'Hast du es verstanden?'), mcKarte(k.check, (ok) => { LA.melden(p.id, 'kap:' + i, ok); if (ok) punkte++; weiter.disabled = false; })) : (weiter.disabled = false, null),
+          k.check && k.check.optionen ? h('div', { class: 'kasten' }, h('div', { class: 'label' }, 'Hast du es verstanden?'), mcKarte(k.check, (ok, info) => { LA.melden(p.id, 'kap:' + i, ok, info); if (ok) punkte++; weiter.disabled = false; })) : (weiter.disabled = false, null),
           h('div', { class: 'reihe rechts' }, weiter));
       };
       zeige();
@@ -93,7 +118,7 @@
         if (i >= fragen.length) { fertig(punkte, fragen.length); return ergebnis(w, punkte, fragen.length, () => SPIELE.multiple_choice.start(w, p, fertig)); }
         const weiter = h('button', { class: 'knopf', disabled: true, onclick: () => { i++; zeige(); } }, 'Weiter');
         LA.setzen(w, fortschrittsbalken(i, fragen.length), h('div', { class: 'label' }, `Frage ${i + 1} von ${fragen.length} · ${punkte} richtig`),
-          mcKarte(fragen[i], (ok) => { LA.melden(p.id, 'mc:' + p.multiple_choice.indexOf(fragen[i]), ok); if (ok) punkte++; weiter.disabled = false; weiter.focus(); }), h('div', { class: 'reihe rechts' }, weiter));
+          mcKarte(fragen[i], (ok, info) => { LA.melden(p.id, 'mc:' + p.multiple_choice.indexOf(fragen[i]), ok, info); if (ok) punkte++; weiter.disabled = false; weiter.focus(); }, { sicherheit: LA.sicherheitAktiv(p) }), h('div', { class: 'reihe rechts' }, weiter));
       };
       zeige();
     },
@@ -136,7 +161,7 @@
           f.classList.remove('richtig', 'fast', 'falsch'); f.classList.add(urteil);
           f.title = urteil === 'richtig' ? '' : 'Richtig: ' + f.dataset.loesung;
           if (urteil !== 'falsch') punkte++;
-          if (!gemeldet && f.value.trim()) LA.melden(p.id, `lt:${ltNr}:${n}`, urteil !== 'falsch');
+          if (!gemeldet && f.value.trim()) LA.melden(p.id, `lt:${ltNr}:${n}`, urteil !== 'falsch', { antwort: urteil === 'falsch' ? f.value.trim().toLowerCase() : '' });
           if (urteil === 'fast') fast.push(`«${f.value.trim()}» → ${f.dataset.loesung}`);
         }
         gemeldet = true;
@@ -339,12 +364,15 @@
         const weiter = h('button', { class: 'knopf', disabled: true, onclick: () => { i++; zeige(); } }, 'Weiter');
         const antwort = (wahl, k) => {
           wk.disabled = fk.disabled = true;
-          const ok = wahl === a.wahr; if (ok) punkte++;
-          LA.melden(p.id, 'wf:' + p.wahr_falsch.indexOf(a), ok);
-          k.classList.add(ok ? 'richtig' : 'falsch');
-          rueck.className = 'rueckmeldung ' + (ok ? 'ok' : 'nein');
-          LA.setzen(rueck, h('strong', null, (ok ? 'Richtig – ' : 'Nein – ') + (a.wahr ? 'die Aussage stimmt. ' : 'die Aussage stimmt nicht. ')), a.erklaerung || '');
-          weiter.disabled = false; weiter.focus();
+          k.classList.add('gewaehlt');
+          LA.sicherheitDann(LA.sicherheitAktiv(p), rueck, (sicherheit) => {
+            const ok = wahl === a.wahr; if (ok) punkte++;
+            LA.melden(p.id, 'wf:' + p.wahr_falsch.indexOf(a), ok, { sicherheit });
+            k.classList.remove('gewaehlt'); k.classList.add(ok ? 'richtig' : 'falsch');
+            rueck.className = 'rueckmeldung ' + (ok ? 'ok' : 'nein');
+            LA.setzen(rueck, h('strong', null, (ok ? 'Richtig – ' : 'Nein – ') + (a.wahr ? 'die Aussage stimmt. ' : 'die Aussage stimmt nicht. ')), a.erklaerung || '', LA.sicherheitHinweis(ok, sicherheit));
+            weiter.disabled = false; weiter.focus();
+          });
         };
         const wk = h('button', { class: 'option gross', onclick: () => antwort(true, wk) }, 'Wahr');
         const fk = h('button', { class: 'option gross', onclick: () => antwort(false, fk) }, 'Falsch');
@@ -413,7 +441,7 @@
             const ok = b && b.kategorie === kategorien[ki]; if (ok) punkte++;
             c.classList.add(ok ? 'richtig' : 'falsch');
             const gemeint = begriffe.find((x) => x.begriff === c.textContent);
-            if (!zuGemeldet && gemeint) LA.melden(p.id, 'kat:' + p.begriffe.indexOf(gemeint), !!ok);
+            if (!zuGemeldet && gemeint) LA.melden(p.id, 'kat:' + p.begriffe.indexOf(gemeint), !!ok, { antwort: ok ? '' : kategorien[ki] });
           }));
           zuGemeldet = true;
           fertig(punkte, begriffe.length);

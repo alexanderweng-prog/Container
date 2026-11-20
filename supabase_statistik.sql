@@ -205,3 +205,95 @@ grant execute on function public.lw_paket_teilen(jsonb, text, text, text) to ano
 grant execute on function public.lw_paket_aktualisieren(text, jsonb, text, text, text) to anon, authenticated;
 grant execute on function public.lw_paket_loeschen(text, text) to anon, authenticated;
 grant execute on function public.lw_kurzlinks_info(text[]) to anon, authenticated;
+
+-- ============================================================
+-- Erster Versuch, gewählte falsche Antworten, Sicherheit (Migration «lernwerkstatt_erst_antworten»)
+-- ============================================================
+alter table public.lw_statistik
+  add column if not exists erst_richtig integer not null default 0 check (erst_richtig >= 0),
+  add column if not exists erst_falsch integer not null default 0 check (erst_falsch >= 0),
+  add column if not exists sicher_falsch integer not null default 0 check (sicher_falsch >= 0),
+  add column if not exists erst_sicher_falsch integer not null default 0 check (erst_sicher_falsch >= 0),
+  add column if not exists geraten_richtig integer not null default 0 check (geraten_richtig >= 0),
+  add column if not exists erst_geraten_richtig integer not null default 0 check (erst_geraten_richtig >= 0);
+
+-- Gewählte falsche Antworten. Nicht direkt lesbar: freie Eingaben (Lückentext, Fachbegriff) erscheinen
+-- erst ab 3 gleichen Antworten, damit keine Namen oder Einzelbemerkungen öffentlich sichtbar werden.
+create table if not exists public.lw_antworten (
+  paket_id text not null,
+  karte_id text not null,
+  kurz text not null default '',
+  art text not null default '' check (length(art) <= 20),
+  antwort text not null check (length(antwort) between 1 and 80),
+  anzahl integer not null default 0 check (anzahl >= 0),
+  erst_anzahl integer not null default 0 check (erst_anzahl >= 0),
+  aktualisiert timestamptz not null default now(),
+  primary key (paket_id, karte_id, kurz, antwort)
+);
+alter table public.lw_antworten enable row level security;
+revoke all on public.lw_antworten from anon, authenticated;
+
+drop function if exists public.lw_statistik_melden(text, text, text, text, text, boolean, boolean, text);
+create function public.lw_statistik_melden(p_paket text, p_titel text, p_karte text, p_frage text, p_art text,
+  p_richtig boolean, p_wiederholung boolean, p_kurz text default '', p_erst boolean default false,
+  p_sicherheit text default '', p_antwort text default '')
+returns void language plpgsql security definer set search_path = '' as $$
+declare
+  v_kurz text := lower(coalesce(p_kurz, ''));
+  v_erst boolean := coalesce(p_erst, false);
+  v_sicher boolean := coalesce(p_sicherheit, '') = 'sicher';
+  v_geraten boolean := coalesce(p_sicherheit, '') in ('unsicher', 'geraten');
+  v_antwort text := left(regexp_replace(trim(coalesce(p_antwort, '')), '\s+', ' ', 'g'), 80);
+begin
+  if p_paket is null or p_karte is null or length(p_paket) not between 1 and 64 or length(p_karte) not between 1 and 40 or p_richtig is null then
+    raise exception 'ungültige Meldung';
+  end if;
+  if v_kurz <> '' and v_kurz !~ '^[a-z2-9]{7}$' then v_kurz := ''; end if;
+  insert into public.lw_statistik as s (paket_id, karte_id, kurz, paket_titel, frage, art, richtig, falsch, wiederholt,
+      erst_richtig, erst_falsch, sicher_falsch, erst_sicher_falsch, geraten_richtig, erst_geraten_richtig)
+  values (
+    p_paket, p_karte, v_kurz,
+    left(coalesce(p_titel, ''), 200), left(coalesce(p_frage, ''), 400), left(coalesce(p_art, ''), 20),
+    (p_richtig)::int, (not p_richtig)::int, coalesce(p_wiederholung, false)::int,
+    (v_erst and p_richtig)::int, (v_erst and not p_richtig)::int,
+    (v_sicher and not p_richtig)::int, (v_erst and v_sicher and not p_richtig)::int,
+    (v_geraten and p_richtig)::int, (v_erst and v_geraten and p_richtig)::int
+  )
+  on conflict (paket_id, karte_id, kurz) do update set
+    richtig = s.richtig + excluded.richtig,
+    falsch = s.falsch + excluded.falsch,
+    wiederholt = s.wiederholt + excluded.wiederholt,
+    erst_richtig = s.erst_richtig + excluded.erst_richtig,
+    erst_falsch = s.erst_falsch + excluded.erst_falsch,
+    sicher_falsch = s.sicher_falsch + excluded.sicher_falsch,
+    erst_sicher_falsch = s.erst_sicher_falsch + excluded.erst_sicher_falsch,
+    geraten_richtig = s.geraten_richtig + excluded.geraten_richtig,
+    erst_geraten_richtig = s.erst_geraten_richtig + excluded.erst_geraten_richtig,
+    paket_titel = excluded.paket_titel,
+    frage = excluded.frage,
+    art = excluded.art,
+    aktualisiert = now();
+
+  if not p_richtig and v_antwort <> '' then
+    insert into public.lw_antworten as a (paket_id, karte_id, kurz, art, antwort, anzahl, erst_anzahl)
+    values (p_paket, p_karte, v_kurz, left(coalesce(p_art, ''), 20), v_antwort, 1, v_erst::int)
+    on conflict (paket_id, karte_id, kurz, antwort) do update set
+      anzahl = a.anzahl + 1, erst_anzahl = a.erst_anzahl + excluded.erst_anzahl, aktualisiert = now();
+  end if;
+end; $$;
+
+-- Falsche Antworten für die Auswertung: Auswahl-Antworten (mc, kat) immer, freie Eingaben erst ab 3 gleichen
+create or replace function public.lw_antworten_laden()
+returns table (paket_id text, karte_id text, kurz text, art text, antwort text, anzahl int, erst_anzahl int)
+language sql security definer set search_path = '' stable as $$
+  select a.paket_id, a.karte_id, a.kurz, a.art, a.antwort, a.anzahl, a.erst_anzahl
+    from public.lw_antworten a
+   where a.art in ('mc', 'kap', 'kat') or a.anzahl >= 3
+   order by a.anzahl desc
+   limit 20000;
+$$;
+
+revoke all on function public.lw_statistik_melden(text, text, text, text, text, boolean, boolean, text, boolean, text, text) from public;
+revoke all on function public.lw_antworten_laden() from public;
+grant execute on function public.lw_statistik_melden(text, text, text, text, text, boolean, boolean, text, boolean, text, text) to anon, authenticated;
+grant execute on function public.lw_antworten_laden() to anon, authenticated;

@@ -112,6 +112,18 @@ legend { font-weight: 600; padding: 0 6px; }
 .option:disabled { cursor: default; }
 .option.richtig { border-color: var(--ok); background: var(--ok-soft); }
 .option.falsch { border-color: var(--no); background: var(--no-soft); }
+.option.gewaehlt { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.option:disabled.gewaehlt { opacity: 1; }
+.sicherheit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sicherheit-frage { font-weight: 600; margin-right: 4px; }
+.sicherheit-hinweis { margin-top: 6px; font-size: 14px; }
+.tag.sicher-falsch { margin-left: 8px; color: var(--no); border-color: var(--no); }
+.aw-antworten { margin-top: 4px; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.aw-antworten .label { font-size: 11px; }
+.aw-antwort { background: var(--no-soft); color: var(--ink); border-radius: 4px; padding: 0 5px; }
+.aw-warnung { color: var(--no); font-weight: 700; }
+.aw-lesehilfe summary { cursor: pointer; font-weight: 600; }
+.aw-lesehilfe ul { margin: 8px 0 0; padding-left: 20px; font-size: 14px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
 .option.gross { text-align: center; font-size: 18px; font-weight: 700; }
 .wf { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .rueckmeldung { padding: 0; }

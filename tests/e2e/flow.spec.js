@@ -1,6 +1,6 @@
 // Flow-Training im Browser
 const { test, expect } = require('@playwright/test');
-const { fehlerSammeln, demoOeffnen } = require('./hilfen');
+const { fehlerSammeln, demoOeffnen, sicher } = require('./hilfen');
 
 let fehler;
 test.beforeEach(({ page }) => { fehler = fehlerSammeln(page); });
@@ -35,6 +35,7 @@ async function beantworten(page, richtig) {
     await a.locator('input[type=text]').fill(richtig ? loesung.ein : 'xyzxyz');
     await a.getByRole('button', { name: 'Prüfen' }).click();
   }
+  await sicher(page);
   await page.locator('.flow-aufgabe .reihe.rechts .knopf').click();
 }
 

@@ -195,8 +195,13 @@ test('Statistik: Fingerabdruck und gemeldete Daten (ohne Personendaten)', () => 
   assert.notEqual(LA.fingerabdruck('Frage A'), LA.fingerabdruck('Frage B'));
   assert.match(LA.fingerabdruck('x'), /^[0-9a-f]{8}$/);
   const p = Object.assign(LA.paketPruefen(structuredClone(LA.DEMO)), { id: 'p1', niveau: 3, quelle: 'ki' });
-  const m = LA.statistikMeldung(p, 'mc:0', false, true);
-  assert.deepEqual(Object.keys(m).sort(), ['p_art', 'p_frage', 'p_karte', 'p_kurz', 'p_paket', 'p_richtig', 'p_titel', 'p_wiederholung']);
+  const m = LA.statistikMeldung(p, 'mc:0', false, true, '', { sicherheit: 'sicher', antwort: '  Kochen ', erst: true });
+  assert.deepEqual(Object.keys(m).sort(), ['p_antwort', 'p_art', 'p_erst', 'p_frage', 'p_karte', 'p_kurz', 'p_paket', 'p_richtig', 'p_sicherheit', 'p_titel', 'p_wiederholung']);
+  assert.equal(m.p_antwort, 'Kochen');
+  assert.equal(m.p_sicherheit, 'sicher');
+  // Richtige Antworten werden nie als Text gemeldet, unbekannte Sicherheit fällt weg
+  const r = LA.statistikMeldung(p, 'mc:0', true, false, '', { sicherheit: 'egal', antwort: 'x' });
+  assert.equal(r.p_antwort, ''); assert.equal(r.p_sicherheit, '');
   assert.equal(m.p_titel, 'Der Wasserkreislauf · Niveau 3');
   assert.equal(m.p_frage, p.multiple_choice[0].frage);
   assert.match(m.p_karte, /^mc:[0-9a-f]{8}$/);
@@ -206,4 +211,21 @@ test('Statistik: Fingerabdruck und gemeldete Daten (ohne Personendaten)', () => 
   const q = structuredClone(p); q.multiple_choice.reverse();
   assert.equal(LA.statistikMeldung(q, `mc:${q.multiple_choice.length - 1}`, true, false).p_karte, m.p_karte);
   assert.equal(LA.statistikMeldung(p, 'mc:999', true, false), null);
+});
+
+test('Lernkartei: geratene Treffer gelten nicht als gelernt, sichere Fehler werden markiert', () => {
+  const LA = laden('util.js', 'ki.js', 'offline.js', 'wiederholen.js');
+  const p = Object.assign(LA.paketPruefen(structuredClone(LA.DEMO)), { id: 'pk' });
+  LA.melden('pk', 'mc:0', true, { sicherheit: 'geraten' });
+  LA.melden('pk', 'mc:1', true, { sicherheit: 'sicher' });
+  LA.melden('pk', 'mc:2', false, { sicherheit: 'sicher' });
+  const s = Object.fromEntries(LA.lernstand(p).eintraege);
+  assert.equal(s['mc:0'].fach, 1, 'geraten: bleibt im ersten Fach');
+  assert.equal(s['mc:0'].unsicher, 1);
+  assert.equal(s['mc:1'].fach, 2, 'sicher richtig: normal weiter');
+  assert.equal(s['mc:2'].fach, 1);
+  assert.equal(s['mc:2'].sicherFalsch, 1);
+  // geraten richtig ist morgen wieder fällig, nicht erst in Tagen
+  const morgen = new Date(); morgen.setDate(morgen.getDate() + 1);
+  assert.equal(s['mc:0'].faellig, `${morgen.getFullYear()}-${String(morgen.getMonth() + 1).padStart(2, '0')}-${String(morgen.getDate()).padStart(2, '0')}`);
 });

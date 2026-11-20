@@ -1,6 +1,6 @@
 // Kurzlinks mit QR-Code – Supabase wird abgefangen (eine kleine Attrappe im Speicher)
 const { test, expect } = require('@playwright/test');
-const { fehlerSammeln } = require('./hilfen');
+const { fehlerSammeln, sicher } = require('./hilfen');
 
 const SUPABASE = 'https://efsznvanzievcxvewgpi.supabase.co';
 
@@ -22,6 +22,7 @@ async function datenbank(context, statistik = []) {
     if (name === 'lw_paket_laden') { if (e) e.abrufe++; return antwort(route, e ? e.daten : null); }
     if (name === 'lw_kurzlinks_info') return antwort(route, body.p_codes.filter((c) => db.has(c)).map((c) => ({ code: c, titel: 'T', klasse: db.get(c).klasse, abrufe: db.get(c).abrufe, erstellt: '2026-11-20T08:00:00Z', aktualisiert: '2026-11-20T08:00:00Z' })));
     if (name === 'lw_statistik_melden') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*' } });
+    if (name === 'lw_antworten_laden') return antwort(route, []);
     return route.fulfill({ status: 404, headers: { 'access-control-allow-origin': '*' } });
   });
   return { db, aufrufe };
@@ -129,9 +130,9 @@ test('Unbekannter Kurzlink: verständliche Meldung; offline: letzte Fassung', as
 test('Ein Kurzlink pro Klasse: Antworten zählen getrennt, «Meine Kurzlinks», Auswertung pro Klasse', async ({ page, context }) => {
   const fehler = fehlerSammeln(page);
   const statistik = [
-    { paket_id: 'paket-1', karte_id: 'mc:aa', kurz: 'abc2345', paket_titel: 'Der Wasserkreislauf', frage: 'Frage A', art: 'mc', richtig: 1, falsch: 9, wiederholt: 0, aktualisiert: '2026-11-20T09:00:00Z' },
-    { paket_id: 'paket-1', karte_id: 'mc:aa', kurz: 'xyz6789', paket_titel: 'Der Wasserkreislauf', frage: 'Frage A', art: 'mc', richtig: 9, falsch: 1, wiederholt: 2, aktualisiert: '2026-11-20T09:00:00Z' },
-    { paket_id: 'paket-1', karte_id: 'mc:aa', kurz: '', paket_titel: 'Der Wasserkreislauf', frage: 'Frage A', art: 'mc', richtig: 0, falsch: 2, wiederholt: 0, aktualisiert: '2026-11-20T09:00:00Z' },
+    { paket_id: 'paket-1', karte_id: 'mc:aa', kurz: 'abc2345', paket_titel: 'Der Wasserkreislauf', frage: 'Frage A', art: 'mc', richtig: 1, falsch: 9, wiederholt: 0, erst_richtig: 1, erst_falsch: 5, aktualisiert: '2026-11-20T09:00:00Z' },
+    { paket_id: 'paket-1', karte_id: 'mc:aa', kurz: 'xyz6789', paket_titel: 'Der Wasserkreislauf', frage: 'Frage A', art: 'mc', richtig: 9, falsch: 1, wiederholt: 2, erst_richtig: 8, erst_falsch: 1, aktualisiert: '2026-11-20T09:00:00Z' },
+    { paket_id: 'paket-1', karte_id: 'mc:aa', kurz: '', paket_titel: 'Der Wasserkreislauf', frage: 'Frage A', art: 'mc', richtig: 0, falsch: 2, wiederholt: 0, erst_richtig: 0, erst_falsch: 2, aktualisiert: '2026-11-20T09:00:00Z' },
   ];
   const { db, aufrufe } = await datenbank(context, statistik);
   await lehrperson(page, false);
@@ -163,6 +164,7 @@ test('Ein Kurzlink pro Klasse: Antworten zählen getrennt, «Meine Kurzlinks», 
   await s.goto('/#p=xyz6789');
   await s.locator('.spiel', { hasText: 'Wahr oder falsch' }).click();
   await s.getByRole('button', { name: 'Wahr', exact: true }).click();
+  await sicher(s);
   await expect.poll(() => aufrufe.filter((a) => a.name === 'lw_statistik_melden').length).toBe(1);
   expect(aufrufe.find((a) => a.name === 'lw_statistik_melden').body.p_kurz).toBe('xyz6789');
 
@@ -183,13 +185,18 @@ test('Ein Kurzlink pro Klasse: Antworten zählen getrennt, «Meine Kurzlinks», 
   const klasse = page.getByRole('combobox', { name: 'Klasse wählen' });
   await expect(klasse).toHaveValue('abc2345');
   await expect(page.locator('tbody tr')).toHaveCount(1);
-  await expect(page.locator('tbody tr td').nth(3)).toHaveText('9'); // 2a: 9× falsch
+  await expect(page.locator('tbody tr td').nth(3)).toHaveText('5'); // 2a: erster Versuch 5× falsch
+  await page.getByRole('combobox', { name: 'Zählweise' }).selectOption('alle');
+  await expect(page.locator('tbody tr td').nth(3)).toHaveText('9'); // alle Versuche
   await klasse.selectOption({ label: 'Klasse 2b Sport (xyz6789)' });
   await expect(page.locator('tbody tr td').nth(3)).toHaveText('1');
   await klasse.selectOption({ label: 'Alle Klassen zusammen' });
   await expect(page.locator('tbody tr td').nth(2)).toHaveText('10');
   await expect(page.locator('tbody tr td').nth(3)).toHaveText('12');
-  await expect(page.locator('tbody tr td').nth(5)).toHaveText('2');
+  await expect(page.locator('tbody tr td').nth(7)).toHaveText('2');
+  await page.getByRole('combobox', { name: 'Zählweise' }).selectOption('erst');
+  await expect(page.locator('tbody tr td').nth(2)).toHaveText('9');
+  await expect(page.locator('tbody tr td').nth(3)).toHaveText('8');
   await klasse.selectOption({ label: 'Ohne Kurzlink (eigene Geräte, lange Links)' });
   await expect(page.locator('tbody tr td').nth(3)).toHaveText('2');
   await page.getByRole('button', { name: '← Zurück' }).click();

@@ -153,6 +153,10 @@ Ohne Docker geht es auch mit Node.js ab Version 20: `ANTHROPIC_API_KEY=… KLASS
 
 Unter **📊 Auswertung** auf der Startseite (oder direkt `…/#auswertung`) steht pro Paket eine Tabelle: jede Frage mit der Anzahl **richtig**, **falsch**, dem **Anteil falsch** und wie oft sie in der **Wiederholung** (Lernkartei) dran war. Die schwierigsten Fragen stehen oben. Filter nach Paket, Suche, Mindestanzahl Antworten und Export als CSV (Excel). In der Paketübersicht zeigt «Auswertung» nur dieses Paket (mit allen Niveaus).
 
+- **Nur erster Versuch** (Standard): Pro Gerät zählt nur die erste Antwort auf eine Frage. So sieht man, was die Klasse wirklich konnte; «Alle Versuche» zählt auch Wiederholungen mit.
+- **Häufig falsch gewählt:** Welche falschen Antworten gewählt wurden (Multiple Choice, Zuordnen). Frei getippte Antworten (Lückentext, Fachbegriff) erscheinen erst ab drei gleichen, damit keine Namen oder Einzelbemerkungen öffentlich werden.
+- **Wie sicher bist du?** Bei Multiple Choice, Wahr/Falsch, Wiederholen und Flow-Training wählen die Lernenden vor dem Auflösen «sicher», «unsicher» oder «geraten». Die Auswertung zeigt **sicher falsch** (hartnäckige Fehlvorstellung) und **richtig geraten** (wackeliges Wissen). Geratene Treffer gelten in der Lernkartei nicht als gelernt und kommen am nächsten Tag wieder. Abschaltbar pro Paket im Editor.
+
 - **Anonym:** Gezählt werden nur Summen pro Frage. Es werden keine Namen, keine Geräte-Kennung und keine Zeitpunkte pro Person gespeichert. Supabase protokolliert wie jeder Webdienst technische Zugriffe (z. B. IP-Adressen) in seinen Server-Logs. Die App selbst speichert sie nicht.
 - **Öffentlich:** Jede Person mit der Adresse kann die Auswertung ansehen.
 - **Speicher:** Supabase-Projekt «Leistungs App», Tabelle `lw_statistik` (getrennt von den Naturalia-Tabellen). Lesen ist für alle erlaubt, Schreiben nur über die Datenbank-Funktion `lw_statistik_melden`, die ausschliesslich hochzählt.

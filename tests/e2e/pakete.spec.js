@@ -1,6 +1,6 @@
 // Pakete erstellen, teilen, bearbeiten, wiederholen, drucken
 const { test, expect } = require('@playwright/test');
-const { fehlerSammeln, demoOeffnen, spielOeffnen, zurueck } = require('./hilfen');
+const { fehlerSammeln, demoOeffnen, spielOeffnen, zurueck, sicher } = require('./hilfen');
 
 let fehler;
 test.beforeEach(async ({ page }) => { fehler = fehlerSammeln(page); });
@@ -56,6 +56,7 @@ test('Lernkartei: Fehler werden fällig, Wiederholung, Fehlerheft', async ({ pag
   await spielOeffnen(page, 'Wahr oder falsch');
   for (let i = 0; i < 6; i++) {
     await page.getByRole('button', { name: 'Wahr', exact: true }).click();
+    await sicher(page);
     await page.locator('.reihe.rechts .knopf').click();
   }
   await page.getByRole('button', { name: 'Zur Übersicht' }).click();
@@ -68,6 +69,7 @@ test('Lernkartei: Fehler werden fällig, Wiederholung, Fehlerheft', async ({ pag
     const aussage = await page.locator('.frage').innerText();
     const wahr = await page.evaluate((t) => LA.DEMO.wahr_falsch.find((a) => t.includes(a.aussage)).wahr, aussage);
     await page.getByRole('button', { name: wahr ? 'Wahr' : 'Falsch', exact: true }).click();
+    await sicher(page);
     await page.locator('.reihe.rechts .knopf').click();
   }
   await expect(page.locator('.ergebnis-zahl')).toHaveText('3 / 3');

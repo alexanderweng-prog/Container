@@ -133,10 +133,10 @@
       const { item, art } = LA.flowWaehlen(vorrat, z.theta, sitzung);
       sitzung.gezeigt.push(item.schluessel);
       const weiter = h('button', { class: 'knopf', disabled: true, onclick: naechste }, sitzung.anzahl + 1 < RUNDE ? 'Weiter' : 'Auswerten');
-      const antwort = (ok) => {
+      const antwort = (ok, info = {}) => {
         LA.flowVerbuchen(z, item, ok);
         zustandSpeichern(gruppe, z); itemsSpeichern(item);
-        LA.melden(item.paket.id, item.kid, ok); // auch die Lernkartei profitiert
+        LA.melden(item.paket.id, item.kid, ok, info); // auch die Lernkartei profitiert
         sitzung.anzahl++;
         sitzung.log.push({ ok, d: item.d });
         if (ok) { sitzung.richtig++; sitzung.richtigSerie++; sitzung.falschSerie = 0; sitzung.geloest.add(item.schluessel); }
@@ -154,7 +154,7 @@
               mehrereNiveaus ? h('span', { class: 'tag', title: 'Niveau dieser Frage' }, LA.NIVEAUS[item.paket.niveau].zeichen) : null,
               h('span', { class: 'hinweis' }, 'Aus: ' + item.karte.quelle)))),
         h('div', { class: 'flow-raster' },
-          h('div', { class: 'flow-aufgabe' }, LA.karteAnzeigen(item.karte, antwort), h('div', { class: 'reihe rechts' }, weiter)),
+          h('div', { class: 'flow-aufgabe' }, LA.karteAnzeigen(item.karte, antwort, { sicherheit: LA.sicherheitAktiv(item.paket) }), h('div', { class: 'reihe rechts' }, weiter)),
           leiste));
       const feld = w.querySelector('input[type=text]'); if (feld) feld.focus();
     };

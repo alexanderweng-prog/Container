@@ -1,6 +1,6 @@
 // Editor (ohne JSON) und Niveaus
 const { test, expect } = require('@playwright/test');
-const { fehlerSammeln, kiAttrappe, demoOeffnen, spielOeffnen } = require('./hilfen');
+const { fehlerSammeln, kiAttrappe, demoOeffnen, spielOeffnen, sicher } = require('./hilfen');
 
 let fehler;
 test.beforeEach(async ({ page }) => {
@@ -54,7 +54,7 @@ test('Lückentext: markiertes Wort wird zur Lücke', async ({ page }) => {
 test('Löschen: Lernstand der übrigen Fragen bleibt bei der richtigen Frage', async ({ page }) => {
   await demoGespeichert(page);
   await spielOeffnen(page, 'Wahr oder falsch');
-  for (let i = 0; i < 6; i++) { await page.getByRole('button', { name: 'Wahr', exact: true }).click(); await page.locator('.reihe.rechts .knopf').click(); }
+  for (let i = 0; i < 6; i++) { await page.getByRole('button', { name: 'Wahr', exact: true }).click(); await sicher(page); await page.locator('.reihe.rechts .knopf').click(); }
   await page.getByRole('button', { name: 'Zur Übersicht' }).click();
   const vorher = await lernstand(page, 'demo-wasserkreislauf');
   expect(Object.keys(vorher).filter((k) => k.startsWith('wf:')).length).toBe(6);

@@ -32,19 +32,27 @@
   const lesen = (id) => LA.speicher.lesen(schluessel(id), {});
   const schreiben = (id, s) => LA.speicher.schreiben(schluessel(id), s);
 
-  // Jedes Spiel meldet hier jede einzelne Antwort
+  // Jedes Spiel meldet hier jede einzelne Antwort.
+  // optionen: { wiederholung, antwort (gewählte falsche Antwort), sicherheit ('sicher' | 'unsicher' | 'geraten' | '') }
   LA.melden = function (paketId, karteId, richtig, optionen = {}) {
     if (!paketId || !karteId) return;
-    if (LA.statistikMelden) LA.statistikMelden(paketId, karteId, richtig, !!optionen.wiederholung);
+    if (LA.statistikMelden) LA.statistikMelden(paketId, karteId, richtig, optionen);
     const s = lesen(paketId);
     const e = s[karteId] || { fach: 0, faellig: heute(), richtig: 0, falsch: 0 };
-    if (richtig) {
+    const unsicher = optionen.sicherheit === 'unsicher' || optionen.sicherheit === 'geraten';
+    if (richtig && unsicher) {
+      // Geraten oder unsicher: zählt als richtig, gilt aber noch nicht als gelernt → kein Fach weiter, morgen wieder
+      e.richtig++; e.unsicher = (e.unsicher || 0) + 1;
+      if (e.fach === 0) e.fach = 1;
+      e.faellig = plusTage(1);
+    } else if (richtig) {
       e.richtig++;
       // Nur befördern, wenn die Karte fällig war (sonst würde Pauken am selben Tag die Abstände aufblähen)
       if (e.fach === 0) { e.fach = 2; e.faellig = plusTage(ABSTAND[2]); }
       else if (e.faellig <= heute()) { e.fach = Math.min(5, e.fach + 1); e.faellig = plusTage(ABSTAND[e.fach]); }
     } else {
       e.falsch++;
+      if (optionen.sicherheit === 'sicher') e.sicherFalsch = (e.sicherFalsch || 0) + 1;
       e.fach = 1; e.faellig = heute();
     }
     e.zuletzt = heute();
@@ -101,9 +109,9 @@
       const karte = st.karten.get(id);
       const eintrag = lesen(p.id)[id];
       const weiter = h('button', { class: 'knopf', disabled: true, onclick: naechste }, 'Weiter');
-      const antwort = (ok) => {
+      const antwort = (ok, info = {}) => {
         versuche++;
-        LA.melden(p.id, id, ok, { wiederholung: true });
+        LA.melden(p.id, id, ok, { ...info, wiederholung: true });
         if (ok && !schonFalsch.has(id)) geloest++;
         // Falsch: in dieser Runde nochmals, aber nicht sofort hintereinander
         if (!ok && !schonFalsch.has(id)) { schonFalsch.add(id); warteschlange.splice(Math.min(3, warteschlange.length), 0, id); }
@@ -113,7 +121,7 @@
         h('div', { class: 'balken' }, h('div', { style: { width: Math.round(((gesamt - warteschlange.length - 1) / gesamt) * 100) + '%' } })),
         h('div', { class: 'reihe zwischen' }, h('div', { class: 'label' }, `Wiederholen · noch ${warteschlange.length + 1}`), fachAnzeige(eintrag ? eintrag.fach : 0)),
         h('div', { class: 'hinweis' }, 'Aus: ' + karte.quelle),
-        karteAnzeigen(karte, antwort),
+        karteAnzeigen(karte, antwort, { sicherheit: LA.sicherheitAktiv(p) }),
         h('div', { class: 'reihe rechts' }, weiter));
       const erstesFeld = w.querySelector('input[type=text]'); if (erstesFeld) erstesFeld.focus();
     };
@@ -132,7 +140,7 @@
       [1, 2, 3, 4, 5].map((n) => h('span', { class: 'fach-punkt' + (n <= fach ? ' voll' : '') })));
   }
   LA.fachAnzeige = fachAnzeige;
-  LA.karteAnzeigen = (k, antwort) => karteAnzeigen(k, antwort);
+  LA.karteAnzeigen = (k, antwort, opt) => karteAnzeigen(k, antwort, opt);
 
   function naechsteTermine(p) {
     const st = LA.lernstand(p), t = heute();
@@ -154,19 +162,23 @@
   }
 
   /* ---------- Darstellung je Kartenart ---------- */
-  function karteAnzeigen(k, antwort) {
-    if (k.art === 'mc') return LA.mcKarte(k.frage, antwort);
+  // antwort(richtig, { antwort, sicherheit }); opt.sicherheit: vor dem Auflösen nach der Sicherheit fragen
+  function karteAnzeigen(k, antwort, opt = {}) {
+    if (k.art === 'mc') return LA.mcKarte(k.frage, antwort, opt);
 
     if (k.art === 'wf') {
       const rueck = h('div', { class: 'rueckmeldung', 'aria-live': 'polite' });
       const knopf = (wert, text) => {
         const b = h('button', { class: 'option gross', onclick: () => {
           box.querySelectorAll('button.option').forEach((x) => { x.disabled = true; });
-          const ok = wert === k.aussage.wahr;
-          b.classList.add(ok ? 'richtig' : 'falsch');
-          rueck.className = 'rueckmeldung ' + (ok ? 'ok' : 'nein');
-          LA.setzen(rueck, h('strong', null, (ok ? 'Richtig – ' : 'Nein – ') + (k.aussage.wahr ? 'die Aussage stimmt. ' : 'die Aussage stimmt nicht. ')), k.aussage.erklaerung);
-          antwort(ok);
+          b.classList.add('gewaehlt');
+          LA.sicherheitDann(opt.sicherheit, rueck, (sicherheit) => {
+            const ok = wert === k.aussage.wahr;
+            b.classList.remove('gewaehlt'); b.classList.add(ok ? 'richtig' : 'falsch');
+            rueck.className = 'rueckmeldung ' + (ok ? 'ok' : 'nein');
+            LA.setzen(rueck, h('strong', null, (ok ? 'Richtig – ' : 'Nein – ') + (k.aussage.wahr ? 'die Aussage stimmt. ' : 'die Aussage stimmt nicht. ')), k.aussage.erklaerung, LA.sicherheitHinweis(ok, sicherheit));
+            antwort(ok, { sicherheit });
+          });
         } }, text);
         return b;
       };
@@ -180,11 +192,16 @@
       const box = h('div', null, h('div', { class: 'frage' }, `Zu welcher Gruppe gehört «${k.begriff.begriff}»?`),
         h('div', { class: 'optionen' }, k.kategorien.map((kat) => {
           const b = h('button', { class: 'option', onclick: () => {
-            box.querySelectorAll('button.option').forEach((x) => { x.disabled = true; if (x.textContent === k.begriff.kategorie) x.classList.add('richtig'); });
-            const ok = kat === k.begriff.kategorie; if (!ok) b.classList.add('falsch');
-            rueck.className = 'rueckmeldung ' + (ok ? 'ok' : 'nein');
-            LA.setzen(rueck, h('strong', null, ok ? 'Richtig. ' : 'Nein. '), `${k.begriff.begriff}: ${k.begriff.erklaerung}`);
-            antwort(ok);
+            box.querySelectorAll('button.option').forEach((x) => { x.disabled = true; });
+            b.classList.add('gewaehlt');
+            LA.sicherheitDann(opt.sicherheit, rueck, (sicherheit) => {
+              b.classList.remove('gewaehlt');
+              box.querySelectorAll('button.option').forEach((x) => { if (x.textContent === k.begriff.kategorie) x.classList.add('richtig'); });
+              const ok = kat === k.begriff.kategorie; if (!ok) b.classList.add('falsch');
+              rueck.className = 'rueckmeldung ' + (ok ? 'ok' : 'nein');
+              LA.setzen(rueck, h('strong', null, ok ? 'Richtig. ' : 'Nein. '), `${k.begriff.begriff}: ${k.begriff.erklaerung}`, LA.sicherheitHinweis(ok, sicherheit));
+              antwort(ok, { sicherheit, antwort: ok ? '' : kat });
+            });
           } }, kat);
           return b;
         })), rueck);
@@ -208,13 +225,15 @@
     const pruefen = h('button', { class: 'knopf', onclick: () => {
       if (erledigt || !feld.value.trim()) return;
       erledigt = true; feld.disabled = true; pruefen.disabled = true; tipp.disabled = true;
-      const urteil = LA.antwortPruefen(feld.value, loesung);
-      feld.classList.add(urteil);
-      const ok = urteil !== 'falsch';
-      rueck.className = 'rueckmeldung ' + (ok ? 'ok' : 'nein');
-      LA.setzen(rueck, h('strong', null, urteil === 'richtig' ? 'Richtig. ' : urteil === 'fast' ? 'Fast – achte auf die Schreibweise: ' : 'Gesucht war: '), urteil === 'richtig' ? '' : loesung,
-        k.art === 'begriff' && urteil === 'richtig' ? k.begriff.erklaerung : '');
-      antwort(ok);
+      LA.sicherheitDann(opt.sicherheit, rueck, (sicherheit) => {
+        const urteil = LA.antwortPruefen(feld.value, loesung);
+        feld.classList.add(urteil);
+        const ok = urteil !== 'falsch';
+        rueck.className = 'rueckmeldung ' + (ok ? 'ok' : 'nein');
+        LA.setzen(rueck, h('strong', null, urteil === 'richtig' ? 'Richtig. ' : urteil === 'fast' ? 'Fast – achte auf die Schreibweise: ' : 'Gesucht war: '), urteil === 'richtig' ? '' : loesung,
+          k.art === 'begriff' && urteil === 'richtig' ? k.begriff.erklaerung : '', LA.sicherheitHinweis(ok, sicherheit));
+        antwort(ok, { sicherheit, antwort: ok ? '' : feld.value.trim().toLowerCase() });
+      });
     } }, 'Prüfen');
     feld.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); pruefen.click(); } });
     return h('div', null, frage,
@@ -237,7 +256,7 @@
       h('div', { class: 'statistik' }, [1, 2, 3, 4, 5].map((n) => h('div', { class: 'stat-fach' }, h('div', { class: 'stat-zahl' }, st.faecher[n]), h('div', { class: 'label' }, 'Fach ' + n)))),
       liste.length ? h('ol', { class: 'fehlerliste' }, liste.map(([id, e]) => {
         const [f, l] = text(st.karten.get(id));
-        return h('li', null, h('div', { class: 'reihe zwischen' }, h('span', null, f), fachAnzeige(e.fach)), h('div', null, h('strong', null, '→ ' + l)), h('div', { class: 'hinweis' }, `${e.falsch}× falsch, ${e.richtig}× richtig`));
+        return h('li', null, h('div', { class: 'reihe zwischen' }, h('span', null, f), fachAnzeige(e.fach)), h('div', null, h('strong', null, '→ ' + l)), h('div', { class: 'hinweis' }, `${e.falsch}× falsch, ${e.richtig}× richtig`, e.sicherFalsch ? h('span', { class: 'tag sicher-falsch', title: 'Du warst dir sicher und lagst falsch' }, `${e.sicherFalsch}× sicher falsch`) : null));
       })) : h('p', null, 'Noch keine Fehler gespeichert.'),
       h('div', { class: 'reihe' },
         liste.length ? h('button', { class: 'knopf', onclick: () => LA.wiederholenStarten(w, p, () => {}, liste.map(([id]) => id)) }, 'Alle Fehler jetzt üben') : null,

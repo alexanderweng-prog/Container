@@ -1,6 +1,6 @@
 // Alle Spiele im Demo-Paket: öffnen, spielen, auswerten
 const { test, expect } = require('@playwright/test');
-const { fehlerSammeln, demoOeffnen, spielOeffnen, zurueck } = require('./hilfen');
+const { fehlerSammeln, demoOeffnen, spielOeffnen, zurueck, sicher } = require('./hilfen');
 
 let fehler;
 test.beforeEach(async ({ page }) => { fehler = fehlerSammeln(page); await demoOeffnen(page); });
@@ -32,6 +32,7 @@ test('Multiple Choice: Rückmeldung und Punktzahl', async ({ page }) => {
   await spielOeffnen(page, 'Multiple Choice');
   for (let i = 0; i < 6; i++) {
     await page.locator('.option').first().click();
+    await sicher(page);
     await expect(page.locator('.option.richtig')).toHaveCount(1); // richtige Antwort wird immer markiert
     await page.locator('.reihe.rechts .knopf').click();
   }
@@ -77,6 +78,7 @@ test('Memory: zwei Karten aufdecken', async ({ page }) => {
 test('Wahr oder falsch, Reihenfolge, Zuordnen', async ({ page }) => {
   await spielOeffnen(page, 'Wahr oder falsch');
   await page.getByRole('button', { name: 'Wahr', exact: true }).click();
+  await sicher(page);
   await expect(page.locator('.rueckmeldung')).toContainText(/Richtig|Nein/);
   await zurueck(page);
 
