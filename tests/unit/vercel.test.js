@@ -9,7 +9,7 @@ const gesehen = [];
 const laden = async (datei) => (await import(path.join(__dirname, '..', '..', 'api', datei))).default;
 
 function umgebung(werte) {
-  for (const k of ['ANTHROPIC_API_KEY', 'KLASSEN_CODE', 'VERCEL', 'OHNE_KLASSENCODE', 'MODELLE', 'LIMIT_PRO_STUNDE']) delete process.env[k];
+  for (const k of ['ANTHROPIC_API_KEY', 'KLASSEN_CODE', 'VERCEL', 'OHNE_KLASSENCODE', 'MODELLE', 'LIMIT_PRO_STUNDE', 'ERLAUBTE_URSPRUENGE']) delete process.env[k];
   Object.assign(process.env, { ANTHROPIC_BASE_URL: `http://127.0.0.1:${upstream.address().port}` }, werte);
 }
 const anfrage = (body, kopf = {}) => new Request('https://lernwerkstatt.vercel.app/api/anthropic/v1/messages', {
@@ -74,4 +74,38 @@ test('Ausserhalb von Vercel gilt die Code-Pflicht nicht (Container im eigenen Ne
   const r = await fn.fetch(anfrage({ model: 'claude-haiku-5-5', max_tokens: 10, messages: [] }));
   assert.equal(r.status, 200);
   await r.text();
+});
+
+test('Andere Webseiten (CORS): nur erlaubte Herkunft, Klassencode gilt weiterhin', async () => {
+  const fn = await laden('anthropic/v1/messages.mjs');
+  const status = await laden('status.mjs');
+  const pages = 'https://alexanderweng-prog.github.io';
+  umgebung({ VERCEL: '1', ANTHROPIC_API_KEY: 'sk-ant-geheim', KLASSEN_CODE: 'abc' });
+  // Vorabanfrage: erlaubte Herkunft bekommt Freigabe mit den nötigen Kopfzeilen
+  let r = await fn.fetch(new Request('https://x/api/anthropic/v1/messages', { method: 'OPTIONS', headers: { origin: pages, 'access-control-request-method': 'POST' } }));
+  assert.equal(r.status, 204);
+  assert.equal(r.headers.get('access-control-allow-origin'), pages);
+  assert.match(r.headers.get('access-control-allow-headers'), /x-klassen-code/);
+  // fremde Herkunft: keine Freigabe
+  r = await fn.fetch(new Request('https://x/api/anthropic/v1/messages', { method: 'OPTIONS', headers: { origin: 'https://boese.example' } }));
+  assert.equal(r.status, 403);
+  assert.equal(r.headers.get('access-control-allow-origin'), null);
+  // echte Anfrage von GitHub Pages: mit Code ok und freigegeben, ohne Code 401 (aber lesbar für die App)
+  r = await fn.fetch(anfrage({ model: 'claude-haiku-5-5', max_tokens: 10, messages: [] }, { origin: pages, 'x-klassen-code': 'abc' }));
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('access-control-allow-origin'), pages);
+  await r.text();
+  r = await fn.fetch(anfrage({ model: 'claude-haiku-5-5', max_tokens: 10, messages: [] }, { origin: pages }));
+  assert.equal(r.status, 401);
+  assert.equal(r.headers.get('access-control-allow-origin'), pages);
+  r = await fn.fetch(anfrage({ model: 'claude-haiku-5-5', max_tokens: 10, messages: [] }, { origin: 'https://boese.example', 'x-klassen-code': 'abc' }));
+  assert.equal(r.headers.get('access-control-allow-origin'), null, 'fremde Seite: Browser darf die Antwort nicht lesen');
+  await r.text();
+  // Status-Abfrage von GitHub Pages
+  r = await status.fetch(new Request('https://x/api/status', { headers: { origin: pages } }));
+  assert.equal(r.headers.get('access-control-allow-origin'), pages);
+  // abschaltbar
+  umgebung({ VERCEL: '1', ANTHROPIC_API_KEY: 'sk-ant-geheim', KLASSEN_CODE: 'abc', ERLAUBTE_URSPRUENGE: '' });
+  r = await fn.fetch(new Request('https://x/api/anthropic/v1/messages', { method: 'OPTIONS', headers: { origin: pages } }));
+  assert.equal(r.status, 403);
 });

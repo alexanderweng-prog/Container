@@ -16,6 +16,10 @@ function einstellungen(env) {
     modelle: (env.MODELLE || 'claude-opus-5-5,claude-sonnet-5-5,claude-haiku-5-5').split(',').map((s) => s.trim()).filter(Boolean),
     // Auf Vercel ist die Adresse öffentlich: ohne Klassencode keine KI (ausser ausdrücklich abgeschaltet)
     codePflicht: env.VERCEL === '1' && env.OHNE_KLASSENCODE !== '1',
+    // Andere Webseiten, die die KI nutzen dürfen (z. B. Lern-Apps auf GitHub Pages). Klassencode und Limits gelten auch für sie.
+    // Leer = nur die eigene Seite. Mehrere Adressen mit Komma trennen, ohne Pfad und ohne / am Schluss.
+    urspruenge: (env.ERLAUBTE_URSPRUENGE === undefined ? 'https://alexanderweng-prog.github.io' : env.ERLAUBTE_URSPRUENGE)
+      .split(',').map((s) => s.trim().replace(/\/$/, '')).filter(Boolean),
   };
 }
 
@@ -50,6 +54,34 @@ const geraetVon = (request) => {
   const g = request.headers.get('x-geraet') || '';
   return /^[A-Za-z0-9_-]{16,64}$/.test(g) ? g : '';
 };
+
+// ---------- Zugriff von anderen Webseiten (CORS) ----------
+// Nur Adressen aus ERLAUBTE_URSPRUENGE bekommen die Freigabe. Der Browser blockiert alle anderen.
+function erlaubterUrsprung(request, env) {
+  const o = request.headers.get('origin') || '';
+  return o && einstellungen(env).urspruenge.includes(o) ? o : '';
+}
+function mitCors(antwort, request, env) {
+  const o = erlaubterUrsprung(request, env);
+  antwort.headers.append('vary', 'Origin');
+  if (o) {
+    antwort.headers.set('access-control-allow-origin', o);
+    antwort.headers.set('access-control-expose-headers', 'request-id, retry-after');
+  }
+  return antwort;
+}
+// Vorabanfrage des Browsers (OPTIONS) beantworten
+function vorab(request, env) {
+  const o = erlaubterUrsprung(request, env);
+  if (!o) return new Response(null, { status: 403, headers: { vary: 'Origin' } });
+  return new Response(null, { status: 204, headers: {
+    vary: 'Origin',
+    'access-control-allow-origin': o,
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    'access-control-allow-headers': 'content-type, x-klassen-code, x-geraet, anthropic-version, anthropic-beta',
+    'access-control-max-age': '600',
+  } });
+}
 
 function status(env) {
   const e = einstellungen(env);
@@ -101,4 +133,4 @@ async function weiterleiten(request, env, { ip, zaehler, pfad }) {
   return new Response(antwort.body, { status: antwort.status, headers: weiter }); // Streaming direkt durchreichen
 }
 
-module.exports = { status, weiterleiten, neuerZaehler, einstellungen };
+module.exports = { status, weiterleiten, neuerZaehler, einstellungen, mitCors, vorab };

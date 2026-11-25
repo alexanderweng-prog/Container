@@ -45,7 +45,7 @@ async function kiWeiterleiten(req, res, pfad) {
   const ip = weitergeleitet || req.socket.remoteAddress;
   const body = req.method === 'POST' ? await koerperLesen(req) : undefined;
   const anfrage = new Request('http://intern' + req.url, { method: req.method, headers: req.headers, body });
-  senden(res, await kern.weiterleiten(anfrage, process.env, { ip, zaehler, pfad }));
+  senden(res, kern.mitCors(await kern.weiterleiten(anfrage, process.env, { ip, zaehler, pfad }), anfrage, process.env));
 }
 
 function statisch(req, res, pfad) {
@@ -61,7 +61,10 @@ function statisch(req, res, pfad) {
 
 const server = http.createServer((req, res) => {
   const pfad = new URL(req.url, 'http://x').pathname;
-  if (pfad === '/api/status') return senden(res, kern.status(process.env));
+  // Für die CORS-Prüfung reicht ein Request mit den Kopfzeilen (ohne Inhalt)
+  const nurKopf = () => new Request('http://intern' + req.url, { method: 'GET', headers: req.headers });
+  if (pfad.startsWith('/api/') && req.method === 'OPTIONS') return senden(res, kern.vorab(nurKopf(), process.env));
+  if (pfad === '/api/status') return senden(res, kern.mitCors(kern.status(process.env), nurKopf(), process.env));
   if (pfad.startsWith('/api/anthropic/')) {
     return kiWeiterleiten(req, res, pfad.slice('/api/anthropic'.length)).catch((e) => { console.error(e); if (!res.headersSent) fehler(res, 500, 'Serverfehler.'); else res.destroy(); });
   }

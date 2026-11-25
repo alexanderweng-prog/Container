@@ -172,6 +172,9 @@ Unter **📊 Auswertung** auf der Startseite (oder direkt `…/#auswertung`) ste
 
 ## Online mit Vercel (ohne eigenen Server, Schlüssel bleibt geheim)
 
+**Andere Lern-Apps dürfen mitbenutzen:** Der Server beantwortet auch Anfragen von den Adressen in `ERLAUBTE_URSPRUENGE` (Standard: `https://alexanderweng-prog.github.io`, also deine Apps auf GitHub Pages, z. B. der KI-Import im Editor der MuI-App). Klassencode und Stundenlimit gelten auch für sie. Mehrere Adressen mit Komma trennen. Leer setzen (`ERLAUBTE_URSPRUENGE=` ohne Wert) = nur die eigene Seite.
+
+
 Vercel liefert die App aus und führt die kleine Weiterleitung als Server-Funktion aus (`api/`). Der API-Schlüssel liegt als geschützte Umgebungsvariable bei Vercel, nicht im Browser. HTTPS ist automatisch dabei.
 
 1. Bei vercel.com das GitHub-Repository `Container` als Projekt importieren. Einstellungen: «Framework Preset: Other», sonst nichts ändern.
