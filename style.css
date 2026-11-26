@@ -441,3 +441,24 @@ input.luecke { width: auto; display: inline-block; min-width: 4ch; padding: 2px 
 .inhalt:has(> .pl-leiste) { max-width: 1400px; gap: 12px; }
 .pl-knoepfe { margin-bottom: 12px; }
 .ki-datenschutz { margin: 4px 0 8px; font-size: 13px; }
+
+/* Probeprüfung */
+.pr-aufgaben { padding-left: 22px; display: flex; flex-direction: column; gap: 10px; }
+.pr-aufgaben.digital { padding-left: 0; list-style: none; }
+.pr-aufgabe .frage { margin: 6px 0 10px; }
+.pr-aufgabe input[type=text] { width: 100%; max-width: 420px; }
+.pr-auswertung.ok { border-color: var(--ok); }
+.pr-auswertung.nein { border-color: var(--no); background: var(--no-soft); }
+.pr-typ { display: flex; align-items: center; gap: 6px; margin: 4px 0; flex-wrap: wrap; }
+.pr-anzahl { width: 64px; }
+@media print {
+  .pr-blatt + .pr-blatt { break-before: page; }
+  .pr-aufgaben { padding-left: 6mm !important; display: block; }
+  .pr-aufgaben > li { margin-bottom: 4mm; break-inside: avoid; }
+  .pr-punkte { float: right; font-size: 9pt; color: #333; margin-left: 4mm; }
+  .pr-wf { margin-top: 1.5mm; }
+  .druck-version { font-size: 12pt; font-weight: 700; margin-top: 1mm; }
+  .pr-skala { margin-top: 8mm; break-inside: avoid; }
+  .pr-skala th, .pr-skala td { text-align: center; font-size: 9.5pt; padding: 1mm 1.5mm; }
+}
+.pr-punkte { float: right; color: var(--muted); font-size: 13px; }

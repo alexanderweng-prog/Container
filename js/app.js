@@ -291,7 +291,8 @@
         zustand.schuelerModus ? null : h('div', { class: 'reihe' },
           !istGespeichert ? h('button', { class: 'knopf sekundaer klein', onclick: () => { paketSpeichern(p); paketAnsicht(p); LA.meldung('In «Meine Pakete» gespeichert.'); } }, 'Speichern') : null,
           h('button', { class: 'knopf sekundaer klein', onclick: () => teilen(p) }, 'Teilen'),
-          h('button', { class: 'knopf sekundaer klein', onclick: () => LA.druckDialog(p) }, 'Drucken'),
+          h('button', { class: 'knopf sekundaer klein', onclick: () => LA.druckDialog(p) }, '📄 Drucken / PDF'),
+          h('button', { class: 'knopf sekundaer klein', onclick: () => LA.pruefungDialog(p) }, '📝 Probeprüfung'),
           gruppe.length < 2 && LA.kiVerfuegbar() ? h('button', { class: 'knopf sekundaer klein', onclick: () => {
             if (confirm('Die KI schreibt dieses Paket zusätzlich für Niveau 1 (grundlegend) und Niveau 3 (erweitert) um. Dieses Paket wird Niveau 2. Das kostet etwa doppelt so viel wie ein neues Paket. Weiter?')) niveausErzeugen(p);
           } }, 'Niveaus erzeugen') : null,
@@ -312,6 +313,11 @@
           LA.flowStufe(gruppe) ? h('span', { class: 'spiel-stand', title: 'Deine Stufe im Flow-Training' }, `Stufe ${LA.flowStufe(gruppe)}`) : null) : null,
         h('div', { class: 'spiele' }, uebungen.map((s) => spielKarte(s)))),
       !ls.faellig.length && ls.gesehen ? wiederholenBereich : null,
+      LA.pruefungDigitalMoeglich(p) ? h('section', null, h('div', { class: 'label' }, 'Prüfung üben'),
+        h('div', { class: 'spiele' }, h('button', { class: 'spiel', onclick: () => spielAnsicht('pruefung') },
+          h('span', { class: 'spiel-symbol', 'aria-hidden': 'true' }, '📝'),
+          h('span', { class: 'spiel-text' }, h('span', { class: 'spiel-name' }, 'Probeprüfung'), h('span', { class: 'hinweis' }, 'Wie eine echte Prüfung: ohne Hilfen, mit Note am Ende.')),
+          f.pruefung ? h('span', { class: 'spiel-stand', title: 'Beste Probeprüfung' }, `${f.pruefung.best}/${f.pruefung.max}`) : null))) : null,
       p.spiele_begruendung && !zustand.schuelerModus ? h('p', { class: 'hinweis begruendung' }, h('strong', null, 'Warum diese Spiele? '), p.spiele_begruendung) : null);
   }
   LA.zurUebersicht = () => paketAnsicht(zustand.paket);
@@ -618,6 +624,7 @@
     window.scrollTo({ top: 0 });
     if (s === 'wiederholen') return LA.wiederholenStarten(flaeche, p, () => {});
     if (s === 'fehlerheft') return LA.fehlerheft(flaeche, p);
+    if (s === 'pruefung') return LA.pruefungDigital(flaeche, p, { fertig: (punkte, max) => fortschrittMerken(p.id, 'pruefung', punkte, max) });
     if (s === 'flow') return LA.flowStarten(flaeche, gruppeVon(p), { niveauWechseln: (x) => paketAnsicht(x), lernpfadOeffnen: p.kapitel.length ? () => spielAnsicht('lernpfad') : null });
     LA.SPIELE[s].start(flaeche, p, (punkte, max) => fortschrittMerken(p.id, s, punkte, max));
   }

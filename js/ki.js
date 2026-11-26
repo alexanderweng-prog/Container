@@ -254,6 +254,39 @@ Aufbau:
     return LA.paketPruefen(p);
   };
 
+  /* ---------- 1d. Neue Prüfungsfragen ---------- */
+  const PRUEFUNG_SCHEMA = S.obj({
+    multiple_choice: S.arr(mcFrage),
+    wahr_falsch: S.arr(S.obj({ aussage: S.str, wahr: S.bool, erklaerung: S.str })),
+    lueckentexte: S.arr(S.obj({ titel: S.str, text: S.str })),
+    begriffe: S.arr(S.obj({ begriff: S.str, erklaerung: S.str, kategorie: S.str })),
+    offene_fragen: S.arr(S.obj({ frage: S.str, musterantwort: S.str, kriterien: S.arr(S.str) })),
+  });
+  // anzahl: { mc, wf, luecke, begriff, offen }
+  LA.kiPruefungErzeugen = async function ({ paket, anzahl, beiFortschritt }) {
+    const n = (k) => Math.max(0, Math.min(40, Number(anzahl[k]) || 0));
+    const kontext = {
+      titel: paket.titel, fach: paket.fach, stufe: paket.stufe,
+      lernstoff: paket.kapitel.map((k) => ({ titel: k.titel, erklaerung: k.erklaerung, merksatz: k.merksatz })),
+      begriffe: paket.begriffe.map((b) => `${b.begriff}: ${b.erklaerung}`),
+      vorhandene_fragen: [...paket.multiple_choice.map((q) => q.frage), ...paket.wahr_falsch.map((a) => a.aussage), ...paket.offene_fragen.map((f) => f.frage)],
+    };
+    const r = await jsonAnfrage({
+      system: `Du bist eine erfahrene Lehrperson an einer Schweizer Schule und schreibst eine Probeprüfung (Stufe: ${paket.stufe || 'Sek I'}).
+Schweizer Hochdeutsch (kein ß, immer ss), Du-Form. Halte dich streng an den Lernstoff; erfinde keine Fakten, die nicht daraus hervorgehen.
+Die Aufgaben müssen NEU sein: nicht dieselben Fragen wie in "vorhandene_fragen" und keine blossen Umformulierungen davon. Prüfe Verständnis und Anwendung (Beispiele erkennen, Zusammenhänge, Begründungen), nicht nur Wiedererkennen von Sätzen aus dem Lernstoff. Mische leichte und anspruchsvollere Aufgaben.
+- multiple_choice: genau ${n('mc')} Fragen, je 4 Optionen, "richtig" = Index der richtigen Option, falsche Optionen = typische Fehlvorstellungen. "rueckmeldungen": pro Option ein Satz, warum sie nicht stimmt; bei der richtigen leer.
+- wahr_falsch: genau ${n('wf')} Aussagen, ausgewogen wahr/falsch.
+- lueckentexte: ${n('luecke') ? `insgesamt genau ${n('luecke')} Lücken, verteilt auf 1–2 kurze Texte; Lücken als {{Wort}}, nur Fachbegriffe oder Schlüsselwörter` : 'leeres Array'}.
+- begriffe: genau ${n('begriff')} Fachbegriffe aus dem Lernstoff mit einer NEUEN Umschreibung (höchstens 15 Wörter, ohne den Begriff zu nennen); "kategorie" leer.
+- offene_fragen: genau ${n('offen')} Fragen zum Begründen oder Anwenden, mit Musterantwort und 2–3 Bewertungskriterien.`,
+      content: [{ type: 'text', text: JSON.stringify(kontext) }],
+      schema: PRUEFUNG_SCHEMA, maxTokens: 16000, effort: 'medium', beiFortschritt,
+    });
+    const neu = LA.paketPruefen({ ...structuredClone(paket), ...r });
+    return { multiple_choice: neu.multiple_choice, wahr_falsch: neu.wahr_falsch, lueckentexte: neu.lueckentexte, begriffe: neu.begriffe, offene_fragen: neu.offene_fragen };
+  };
+
   /* ---------- 2. Offene Antwort bewerten ---------- */
   // Zwei Runden: erste Fassung → Hinweis ohne Lösung → Überarbeitung → zweite Bewertung (vorher = erste Runde)
   const BEWERTUNG_SCHEMA = S.obj({ punkte: S.int, feedback: S.str, tipp: S.str, verbesserung: S.str });

@@ -264,3 +264,36 @@ test('Wiederholungsrunde: verteilt auf Pakete, abwechselnd, schwierige Fragen h�
   assert.ok(mit > ohne * 2.5, `gewichtet ${mit} vs. ungewichtet ${ohne} (von 1000)`);
   assert.throws(() => LA.rundeBauen([]), /keine Übungsfragen/);
 });
+
+test('Probeprüfung: Noten, Versionen mit möglichst anderen Aufgaben, Punkte', () => {
+  const LA = laden('util.js', 'ki.js', 'offline.js', 'spiele.js', 'pruefung.js');
+  // Schweizer Noten
+  assert.equal(LA.note(0, 20), 1);
+  assert.equal(LA.note(20, 20), 6);
+  assert.equal(LA.note(12, 20), 4);            // linear: 60 % → 4
+  assert.equal(LA.note(10, 20), 3.5);
+  assert.equal(LA.note(12, 20, { skala: '60' }), 4);
+  assert.equal(LA.note(6, 20, { skala: '60' }), 2.5);   // 30 % → 2,5
+  assert.equal(LA.note(16, 20, { skala: '60' }), 5);    // 80 % → 5
+  assert.equal(LA.note(13, 20, { runden: 0.1 }), 4.3);
+  assert.equal(LA.noteText(4.5), '4,5');
+  // Versionen
+  const p = LA.paketPruefen(structuredClone(LA.DEMO));
+  const v = LA.pruefungBauen(p, { anzahl: { mc: 3, wf: 3, luecke: 2, begriff: 2, offen: 1 }, versionen: 2 });
+  assert.deepEqual(v.map((x) => x.version), ['A', 'B']);
+  assert.equal(v[0].aufgaben.length, 11);
+  assert.equal(v[0].max, 3 + 3 + 2 + 2 + 3);
+  // Das Demo-Paket hat 6 MC-Fragen: A und B bekommen verschiedene
+  const mc = (x) => x.aufgaben.filter((a) => a.typ === 'mc').map((a) => a.frage).sort();
+  assert.equal(mc(v[0]).filter((f) => mc(v[1]).includes(f)).length, 0);
+  // Gemischte Antworten bleiben richtig zugeordnet
+  for (const a of v[0].aufgaben.filter((x) => x.typ === 'mc')) {
+    const q = p.multiple_choice.find((x) => x.frage === a.frage);
+    assert.equal(a.optionen[a.richtig], q.optionen[q.richtig]);
+  }
+  // Lücken: Satz mit Lösung
+  const l = v[0].aufgaben.find((a) => a.typ === 'luecke');
+  assert.ok(l.loesung && (l.vor + l.nach).length > 5);
+  // Mehr verlangt als vorhanden: nur so viele wie da
+  assert.equal(LA.pruefungBauen(p, { anzahl: { mc: 99 } })[0].aufgaben.length, p.multiple_choice.length);
+});

@@ -109,6 +109,9 @@ Eine Bewertung oder Textkorrektur kostet einen Bruchteil davon. Die echten Koste
 - **Meine Kurzlinks** (Startseite): alle in diesem Browser erstellten Links mit Anzahl Aufrufe, QR-Code, Auswertung der Klasse, Umbenennen und Löschen. Ein gelöschter Link funktioniert nicht mehr; die gezählten Antworten bleiben.
 - **Wiederholungsrunde** (Startseite «🔀 Wiederholungsrunde»): gemischte Fragen aus mehreren Paketen als Kurzlink, z. B. als 10-Minuten-Einstieg. Fragen, die in der Auswertung oft falsch waren, kommen häufiger dran. Alle bekommen dieselben Fragen in eigener Reihenfolge; Falsches kommt am Ende nochmals. Die Antworten erscheinen in der Auswertung bei den ursprünglichen Paketen (mit Klasse). Die Runde ist eine feste Auswahl: Spätere Änderungen an den Paketen kommen dort nicht an.
 - **🗳️ Plenum** (in der Paketübersicht): Fragen eines Pakets (Multiple Choice, Wahr/Falsch) nacheinander am Beamer. Die Klasse tritt über QR-Code bei und stimmt anonym ab; die Verteilung erscheint erst nach dem Abstimmen. Danach «Zu zweit diskutieren, dann nochmals abstimmen» (Peer Instruction) und «Lösung zeigen»; die App empfiehlt, ob sich die Diskussion lohnt (bei 30–70 % richtig). Stimmen werden nach zwei Tagen gelöscht und zählen nicht in der Auswertung.
+- **📄 Drucken / PDF** (Paketübersicht): Arbeitsblatt mit wählbaren Teilen und Lösungsblatt. Für ein PDF im Druckfenster «Als PDF speichern» wählen.
+- **📝 Probeprüfung** (Paketübersicht): Prüfungen in 1–4 Versionen (A–D) mit möglichst unterschiedlichen Aufgaben, gemischter Reihenfolge, Punkten pro Aufgabe, Lösungsblatt und Notenskala (linear oder «Note 4 bei 60 %», auf halbe Noten oder Zehntel gerundet). Fragen aus dem Paket oder neue Fragen von der KI, die in den Übungen nicht vorkommen. Ausgabe über Drucken / PDF.
+- **Probeprüfung digital** (für Lernende, in der Paketübersicht unter «Prüfung üben»): 16 automatisch auswertbare Aufgaben ohne Hilfen, Auflösung und Note erst nach der Abgabe; jedes Mal neu zusammengestellt.
 - **Korrekturen kommen an:** Speicherst du das Paket später im Editor, wird der Inhalt hinter dem Kurzlink automatisch ersetzt. Das klappt nur aus dem Browser, in dem du den Kurzlink erstellt hast (dort liegt der Bearbeitungsschlüssel).
 - Die Lernenden sollten den Link als Lesezeichen speichern. Lernkartei und Flow-Stufe bleiben auf ihrem Gerät erhalten.
 - Gespeichert wird das Paket in Supabase (Tabelle `lw_pakete`, gleiches Projekt wie die Auswertung). Abrufen kann es nur, wer den Code kennt. Eine Liste aller Pakete gibt es nicht. Der Bearbeitungsschlüssel liegt dort nur als Prüfsumme. **Nur für Unterrichtsmaterial ohne Namen oder Persönliches.**
@@ -244,6 +247,7 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt. `js/anthropic-sdk-1.5.0.min.js` i
 - `js/statistik.js` – anonyme Zählung und Auswertung für Lehrpersonen
 - `js/runde.js` – Wiederholungsrunde aus mehreren Paketen
 - `js/plenum.js` – Plenumsmodus (Abstimmung im Klassenzimmer)
+- `js/pruefung.js` – Probeprüfungen (Druck/PDF in Versionen, digital mit Note)
 - `js/kurzlink.js`, `js/vendor/qrcode.js` – Kurzlinks und QR-Code (QR Code Generator von Kazuhiko Arase, MIT-Lizenz)
 - `js/app.js` – Ansichten, Speicher, Teilen
 - `server/server.js` – Auslieferung und KI-Weiterleitung mit Schlüssel (ohne Abhängigkeiten)

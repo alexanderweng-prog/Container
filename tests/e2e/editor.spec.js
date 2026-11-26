@@ -146,8 +146,8 @@ test('Niveaus: erzeugen, umschalten, Bibliothek, Teilen, Schüleransicht, Druck'
 
   // Druck: Niveau steht im Kopf
   await page.evaluate(() => { window.print = () => {}; });
-  await page.getByRole('button', { name: 'Drucken' }).click();
-  await page.getByRole('button', { name: 'Drucken / PDF' }).click();
+  await page.getByRole('button', { name: '📄 Drucken / PDF' }).click();
+  await page.locator('dialog').getByRole('button', { name: 'Drucken / PDF' }).click();
   await expect(page.locator('#druckbereich .druck-fach')).toContainText('Niveau 1 ●');
 
   // Teilen: alle Niveaus → Schüleransicht mit Auswahl, ohne Lehrer-Bezeichnungen

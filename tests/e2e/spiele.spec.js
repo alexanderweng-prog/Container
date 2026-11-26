@@ -8,7 +8,7 @@ test.afterEach(() => expect(fehler, 'Fehler im Browser').toEqual([]));
 
 test('Übersicht zeigt Lernpfad und alle passenden Spiele', async ({ page }) => {
   await expect(page.locator('.spiel .spiel-name')).toHaveText([
-    'Lernpfad', 'Flow-Training', 'Multiple Choice', 'Reihenfolge', 'Kreuzworträtsel', 'Memory', 'Zuordnen', 'Lückentext', 'Wahr oder falsch', 'Denkfragen', 'Schreiben & Korrektur',
+    'Lernpfad', 'Flow-Training', 'Multiple Choice', 'Reihenfolge', 'Kreuzworträtsel', 'Memory', 'Zuordnen', 'Lückentext', 'Wahr oder falsch', 'Denkfragen', 'Schreiben & Korrektur', 'Probeprüfung',
   ]);
   // Ohne KI-Schlüssel ist die Textkorrektur als nicht verfügbar markiert
   await expect(page.locator('.spiel', { hasText: 'Schreiben' })).toContainText('braucht KI-Schlüssel');

@@ -26,8 +26,8 @@
     const loesungen = h('input', { type: 'checkbox', checked: true });
     const linien = h('input', { type: 'checkbox', checked: true });
     const d = h('dialog', { class: 'dialog' },
-      h('div', { class: 'reihe zwischen' }, h('h2', null, 'Arbeitsblatt drucken'), h('button', { class: 'mini', 'aria-label': 'schliessen', onclick: () => d.close() }, '✕')),
-      h('p', { class: 'hinweis' }, 'Wähle die Teile aus. Im Druckdialog kannst du auch «Als PDF speichern» wählen.'),
+      h('div', { class: 'reihe zwischen' }, h('h2', null, 'Arbeitsblatt drucken oder als PDF'), h('button', { class: 'mini', 'aria-label': 'schliessen', onclick: () => d.close() }, '✕')),
+      h('p', { class: 'hinweis' }, 'Wähle die Teile aus. Für ein PDF im Druckfenster beim Drucker «Als PDF speichern» wählen (iPad: Teilen → «In Dateien sichern»).'),
       h('div', { class: 'schalter-raster' }, boxen),
       h('label', { class: 'schalter' }, loesungen, ' Lösungsblatt anhängen (neue Seite)'),
       h('label', { class: 'schalter' }, linien, ' Schreiblinien bei Denkfragen und Schreibauftrag'),

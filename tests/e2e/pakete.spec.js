@@ -28,7 +28,7 @@ test('Teilen-Link öffnet die Schüleransicht ohne Bearbeiten', async ({ page, c
   await expect(schueler.getByRole('heading', { level: 1, name: 'Der Wasserkreislauf' })).toBeVisible();
   await expect(schueler.locator('.kopf .tag')).toHaveText('Schüleransicht');
   await expect(schueler.getByRole('button', { name: 'Bearbeiten' })).toHaveCount(0);
-  await expect(schueler.getByRole('button', { name: 'Drucken' })).toHaveCount(0);
+  await expect(schueler.getByRole('button', { name: '📄 Drucken / PDF' })).toHaveCount(0);
 });
 
 test('Kaputter Link: Meldung statt Absturz', async ({ page }) => {
@@ -86,9 +86,9 @@ test('Lernkartei: Fehler werden fällig, Wiederholung, Fehlerheft', async ({ pag
 test('Arbeitsblatt drucken: alle Teile, Lösungsblatt, Kreuzworträtsel mit Gitter', async ({ page }) => {
   await demoOeffnen(page);
   await page.evaluate(() => { window.print = () => {}; });
-  await page.getByRole('button', { name: 'Drucken' }).click();
+  await page.getByRole('button', { name: '📄 Drucken / PDF' }).click();
   await expect(page.locator('dialog .schalter-raster input:checked')).toHaveCount(10);
-  await page.getByRole('button', { name: 'Drucken / PDF' }).click();
+  await page.locator('dialog').getByRole('button', { name: 'Drucken / PDF' }).click();
   const blatt = page.locator('#druckbereich');
   await expect(blatt.locator('.druck-aufgabe h2').first()).toHaveText('Aufgabe 1: Multiple Choice');
   await expect(blatt.locator('.druck-loesung')).toContainText('Lösungen: Der Wasserkreislauf');
